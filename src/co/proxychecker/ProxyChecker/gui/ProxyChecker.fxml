@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.paint.Color?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+
+<VBox prefHeight="600.0" prefWidth="900.0" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="co.proxychecker.ProxyChecker.gui.controllers.ProxyCheckerController">
+    <children>
+        <MenuBar VBox.vgrow="NEVER">
+            <menus>
+                <Menu mnemonicParsing="false" text="File">
+                    <items>
+                        <MenuItem id="open_file" mnemonicParsing="false" text="Open…" onAction="#MenuItemHandler"/>
+                        <Menu mnemonicParsing="false" text="Export">
+                            <items>
+                                <MenuItem id="export_all" onAction="#MenuItemHandler"
+                                          mnemonicParsing="false" text="All Proxies"/>
+                                <SeparatorMenuItem mnemonicParsing="false"/>
+                                <Menu mnemonicParsing="false" text="Alive Proxies">
+                                    <MenuItem id="export_all_alive" onAction="#MenuItemHandler"
+                                              mnemonicParsing="false" text="All Alive Proxies"/>
+                                    <SeparatorMenuItem mnemonicParsing="false"/>
+                                    <MenuItem id="export_alive_elite" onAction="#MenuItemHandler"
+                                              mnemonicParsing="false" text="Elite Proxies"/>
+                                    <MenuItem id="export_alive_anonymous" onAction="#MenuItemHandler"
+                                              mnemonicParsing="false" text="Anonymous Proxies"/>
+                                    <MenuItem id="export_alive_transparent" onAction="#MenuItemHandler"
+                                              mnemonicParsing="false" text="Transparent Proxies"/>
+                                </Menu>
+                                <MenuItem id="export_all_dead" onAction="#MenuItemHandler"
+                                          mnemonicParsing="false" text="Dead Proxies"/>
+                                <SeparatorMenuItem mnemonicParsing="false"/>
+                                <MenuItem id="export_table" onAction="#MenuItemHandler"
+                                          mnemonicParsing="false" text="Entire Table (.csv)"/>
+                            </items>
+                        </Menu>
+                        <SeparatorMenuItem mnemonicParsing="false"/>
+                        <MenuItem id="preferences" onAction="#MenuItemHandler"
+                                  mnemonicParsing="false" text="Preferences…"/>
+                        <SeparatorMenuItem mnemonicParsing="false"/>
+                        <MenuItem id="quit" onAction="#MenuItemHandler"
+                                  mnemonicParsing="false" text="Quit"/>
+                    </items>
+                </Menu>
+                <Menu mnemonicParsing="false" text="Help">
+                    <items>
+                        <MenuItem id="about" onAction="#MenuItemHandler"
+                                  mnemonicParsing="false" text="About Proxy Checker"/>
+                    </items>
+                </Menu>
+            </menus>
+        </MenuBar>
+        <HBox alignment="TOP_CENTER" prefHeight="63.0" prefWidth="900.0">
+            <children>
+                <Label prefHeight="37.0" prefWidth="67.0" text="Proxy: ">
+                    <font>
+                        <Font size="20.0"/>
+                    </font>
+                    <HBox.margin>
+                        <Insets top="10.0"/>
+                    </HBox.margin>
+                    <padding>
+                        <Insets top="5.0"/>
+                    </padding>
+                </Label>
+                <TextField fx:id="field_input" prefHeight="38.0" prefWidth="259.0" promptText="hostname:port"
+                           onAction="#field_input_action">
+                    <HBox.margin>
+                        <Insets top="10.0"/>
+                    </HBox.margin>
+                </TextField>
+                <Button fx:id="button_check" mnemonicParsing="false" prefHeight="37.0" prefWidth="102.0" text="Check"
+                        onAction="#button_check_action">
+                    <HBox.margin>
+                        <Insets left="5.0" top="10.0"/>
+                    </HBox.margin>
+                </Button>
+            </children>
+            <VBox.margin>
+                <Insets/>
+            </VBox.margin>
+        </HBox>
+        <SplitPane dividerPositions="0.2795100222717149" focusTraversable="true" prefHeight="-1.0" prefWidth="-1.0"
+                   VBox.vgrow="ALWAYS">
+            <items>
+                <ListView fx:id="view_loaded_proxies" prefHeight="485.0" prefWidth="447.0"/>
+                <TableView fx:id="table_proxy" prefHeight="200.0" prefWidth="200.0">
+                    <columns>
+                        <TableColumn fx:id="column_ip" prefWidth="143.1781005859375" text="IP"/>
+                        <TableColumn fx:id="column_port" prefWidth="70.427490234375" text="Port"/>
+                        <TableColumn fx:id="column_status" prefWidth="100.54669189453125" text="Status"/>
+                        <TableColumn fx:id="column_anonymity" prefWidth="130.662841796875" text="Anonymity"/>
+                        <TableColumn fx:id="column_country" prefWidth="75.33709716796875" text="Country"/>
+                        <TableColumn fx:id="column_response_time" prefWidth="120" text="Response Time"/>
+                    </columns>
+                </TableView>
+            </items>
+        </SplitPane>
+        <HBox id="HBox" alignment="CENTER_LEFT" spacing="5.0" VBox.vgrow="NEVER">
+            <children>
+                <Label fx:id="label_loaded_proxies" maxHeight="1.7976931348623157E308" maxWidth="-1.0"
+                       text="Loaded Proxies: 0"
+                       HBox.hgrow="ALWAYS">
+                    <font>
+                        <Font size="11.0" fx:id="x3"/>
+                    </font>
+                    <textFill>
+                        <Color blue="0.625" green="0.625" red="0.625" fx:id="x4"/>
+                    </textFill>
+                </Label>
+                <Label text="|" textFill="$x4" HBox.hgrow="NEVER"/>
+                <Label fx:id="label_checked_proxies" font="$x3" maxWidth="-1.0" text="Checked Proxies: 0" textFill="$x4"
+                       HBox.hgrow="NEVER"/>
+                <Label text="|" textFill="$x4" HBox.hgrow="NEVER"/>
+                <Label fx:id="label_working_proxies" font="$x3" maxWidth="-1.0" text="Working Proxies: 0" textFill="$x4"
+                       HBox.hgrow="NEVER"/>
+                <Pane prefHeight="-1.0" prefWidth="-1.0" HBox.hgrow="ALWAYS"/>
+                <Label fx:id="label_ip_address" text="..." textFill="$x4" HBox.hgrow="NEVER"/>
+                <ProgressBar fx:id="progressBar" progress="NaN"/>
+            </children>
+            <padding>
+                <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
+            </padding>
+        </HBox>
+    </children>
+</VBox>
