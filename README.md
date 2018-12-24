@@ -4,12 +4,12 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 
 Main Window
 
-![Image of ProxyChecker](https://i.imgur.com/LQhGyce.gif)
+![Image of ProxyChecker](https://i.imgur.com/WhmwpBJ.gif)
 
 
 Preferences Window
 
-![Image of ProxyChecker Preferences](https://i.imgur.com/EHWw9td.png)
+![Image of ProxyChecker Preferences](https://i.imgur.com/wejFQWT.png)
 
 
 
