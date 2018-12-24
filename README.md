@@ -30,3 +30,8 @@ Preferences Window
 ### Installation & Usage
 Simply download the latest packaged release for your system and run!
 * [Latest Release](https://github.com/HiddenMotives/ProxyChecker/releases/latest)
+
+
+
+
+###### The application icon is provided by David Cross, from [Webhosting Media](http://webhostingmedia.net/) ######
