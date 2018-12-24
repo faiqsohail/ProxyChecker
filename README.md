@@ -13,6 +13,13 @@ Preferences Window
 
 
 
+### Features
+* GUI based
+* Check SOCKS or HTTP Proxies
+* Multithreaded & Multiplatform
+* Proxy Anonymity, Response Time & Country Information
+* Export Table (CSV) and Export Based on Anonymity
+
 ### Requirements
 * Java 1.8+
 * Internet Connection :)
@@ -23,6 +30,3 @@ Preferences Window
 ### Installation & Usage
 Simply download the latest packaged release for your system and run!
 * [Latest Release](https://github.com/HiddenMotives/ProxyChecker/releases/latest)
-
-
-
