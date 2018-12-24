@@ -17,6 +17,8 @@ Preferences Window
 * GUI based
 * Check SOCKS or HTTP Proxies
 * Multithreaded & Multiplatform
+* Filters and Removes Duplicate Proxies
+* Ability to Load from multiple Proxy Lists
 * Proxy Anonymity, Response Time & Country Information
 * Export Table (CSV) and Export Based on Anonymity
 
