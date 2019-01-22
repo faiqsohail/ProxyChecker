@@ -17,9 +17,10 @@ public class LoadCommand {
     /**
      * Manages the addition of one or more files onto the ListView
      * @param view - Listview to add file contents onto
+     * @param list - List of files to add onto the view (null to show dialog)
      */
-    public static void file(ListView<String> view) {
-        List<File> list = FileCommand.getFilesToOpen();
+    public static void file(ListView<String> view, List<File> list) {
+        list = list == null ? FileCommand.getFilesToOpen() : list;
         if (list != null) {
             for (File file : list) {
                 try (BufferedReader br = new BufferedReader(new FileReader(file))) {

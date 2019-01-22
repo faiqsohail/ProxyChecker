@@ -3,6 +3,7 @@ package co.proxychecker.ProxyChecker.gui.controllers;
 import java.net.URL;
 import java.util.ResourceBundle;
 
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
@@ -25,6 +26,9 @@ import co.proxychecker.ProxyChecker.commands.ProxyCheckCommand;
 import co.proxychecker.ProxyChecker.components.entities.ProxyStatus;
 import co.proxychecker.ProxyChecker.gui.events.ProxyCheckerKeyEvent;
 import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.TransferMode;
 
 /**
  * Controller for ProxyChecker.fxml
@@ -109,6 +113,28 @@ public class ProxyCheckerController implements Initializable {
             }
         });
 
+        // allow drag and drop of files into the loaded proxies view
+        view_loaded_proxies.setOnDragOver(new EventHandler<DragEvent>() {
+            @Override
+            public void handle(DragEvent event) {
+                if(!ProxyCheckCommand.isRunning()) {
+                    event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+                } else {
+                    event.acceptTransferModes(TransferMode.NONE);
+                }
+            }
+        });
+
+        // route the files dropped to the proper load command
+        view_loaded_proxies.setOnDragDropped(new EventHandler<DragEvent>() {
+            @Override
+            public void handle(DragEvent event) {
+                if(event.getDragboard().hasFiles()) {
+                    LoadCommand.file(view_loaded_proxies, event.getDragboard().getFiles());
+                }
+            }
+        });
+
         // update loaded proxy count
         view_loaded_proxies.getItems().addListener(new ListChangeListener<String>() {
             @Override
@@ -162,7 +188,9 @@ public class ProxyCheckerController implements Initializable {
             String item_id = item.getId();
             switch (item_id) {
                 case "open_file":
-                    LoadCommand.file(view_loaded_proxies);
+                    if(!ProxyCheckCommand.isRunning()) {
+                        LoadCommand.file(view_loaded_proxies, null);
+                    }
                     break;
                 case "export_all":
                     ExportCommand.save(view_loaded_proxies);
