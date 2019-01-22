@@ -11,10 +11,13 @@ import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Label;
 import javafx.scene.control.Button;
+import javafx.scene.input.DragEvent;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.input.TransferMode;
 import javafx.collections.ListChangeListener;
 import javafx.scene.control.cell.PropertyValueFactory;
+
 
 import co.proxychecker.ProxyChecker.gui.Window;
 import co.proxychecker.ProxyChecker.gui.AlertBox;
@@ -26,9 +29,6 @@ import co.proxychecker.ProxyChecker.commands.ProxyCheckCommand;
 import co.proxychecker.ProxyChecker.components.entities.ProxyStatus;
 import co.proxychecker.ProxyChecker.gui.events.ProxyCheckerKeyEvent;
 import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
-import javafx.scene.input.DragEvent;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.input.TransferMode;
 
 /**
  * Controller for ProxyChecker.fxml
