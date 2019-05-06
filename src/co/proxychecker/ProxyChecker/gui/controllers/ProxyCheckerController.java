@@ -3,6 +3,7 @@ package co.proxychecker.ProxyChecker.gui.controllers;
 import java.net.URL;
 import java.util.ResourceBundle;
 
+import javafx.beans.value.ObservableValue;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -29,6 +30,7 @@ import co.proxychecker.ProxyChecker.commands.ProxyCheckCommand;
 import co.proxychecker.ProxyChecker.components.entities.ProxyStatus;
 import co.proxychecker.ProxyChecker.gui.events.ProxyCheckerKeyEvent;
 import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
+import javafx.util.Callback;
 
 /**
  * Controller for ProxyChecker.fxml
@@ -71,10 +73,12 @@ public class ProxyCheckerController implements Initializable {
     @FXML
     private ProgressBar progressBar;
 
+    private Boolean notifyCompleted;
+
 
     @Override
     public void initialize(URL location, ResourceBundle resourceBundle) {
-
+        notifyCompleted = false;
         // set users IP address on label
         label_ip_address.setText(Settings.getConfig().getIp());
 
@@ -90,6 +94,25 @@ public class ProxyCheckerController implements Initializable {
         column_country.setCellValueFactory(new PropertyValueFactory<>("Country"));
         column_response_time.setCellValueFactory(new PropertyValueFactory<>("ResponseTime"));
 
+        table_proxy.setRowFactory(tp -> new TableRow<Proxy>() {
+            @Override
+            protected void updateItem(Proxy proxy, boolean empty) {
+                super.updateItem(proxy, empty);
+                if ((proxy == null) || (proxy.getProxyStatus() == ProxyStatus.DEAD))  {
+                    setStyle("");
+                } else {
+                    ProxyAnonymity anonymity = proxy.getProxyAnonymity();
+                    if(anonymity == ProxyAnonymity.ELITE) {
+                        setStyle("-fx-background-color: #32CC32;");
+                    } else if(anonymity == ProxyAnonymity.ANONYMOUS) {
+                        setStyle("-fx-background-color: #F4FF00;");
+                    } else if (anonymity == ProxyAnonymity.TRANSPARENT) {
+                        setStyle("-fx-background-color: #F37D83;");
+                    }
+                }
+            }
+        });
+
         // manage progress bar and count for working proxies and checked proxies
         table_proxy.getItems().addListener(new ListChangeListener<Proxy>() {
             @Override
@@ -97,11 +120,14 @@ public class ProxyCheckerController implements Initializable {
                 if(!c.getList().isEmpty()) {
                     Proxy proxy = c.getList().get(c.getList().size()-1); // newest added proxy
                     label_checked_proxies.setText("Checked Proxies: " + String.valueOf(c.getList().size()));
-                    if(c.getList().size() == view_loaded_proxies.getItems().size()) {
+                    if((c.getList().size() == view_loaded_proxies.getItems().size())) {
                         progressBar.setProgress(0f);
                         button_check.setDisable(false); // disable check button until all proxies are checked
-                        AlertBox.show(Alert.AlertType.INFORMATION, "Task Completed",
-                                "Proxy Checker has finished checking your proxies!");
+                        if(!notifyCompleted) {
+                            AlertBox.show(Alert.AlertType.INFORMATION, "Task Completed",
+                                    "Proxy Checker has finished checking your proxies!");
+                            notifyCompleted = true;
+                        }
                     } else {
                         progressBar.setProgress((float) c.getList().size() / view_loaded_proxies.getItems().size());
                     }
@@ -169,6 +195,7 @@ public class ProxyCheckerController implements Initializable {
             field_input.requestFocus();
             button_check.setDisable(true);
             ProxyCheckCommand.check(view_loaded_proxies, table_proxy);
+            notifyCompleted = false;
 
         } else {
             AlertBox.show(Alert.AlertType.INFORMATION,"No Loaded Proxies",

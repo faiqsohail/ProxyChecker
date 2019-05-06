@@ -84,11 +84,11 @@ public class ProxyCheckCommand {
             Pair<HttpURLConnection, Long> pair = requestAPI.connect(proxy);
             if(pair != null) {
                 try {
-                    this.proxy.setResponseTime(pair.getValue() + " (ms)");
                     this.proxy.setProxyStatus(ProxyStatus.ALIVE);
                     RequestAPI.Response response = requestAPI.getResponse(pair.getKey());
                     this.proxy.setProxyAnonymity(response.anonymity);
                     this.proxy.setCountry(response.country);
+                    this.proxy.setResponseTime(pair.getValue() + " (ms)");
 
                 } catch (Exception e) {
                     this.proxy.setProxyStatus(ProxyStatus.DEAD);
