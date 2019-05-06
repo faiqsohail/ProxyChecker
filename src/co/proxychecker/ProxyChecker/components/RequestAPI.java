@@ -87,6 +87,7 @@ public class RequestAPI {
                     System.getProperty("os.name") + " v." + System.getProperty("os.version"));
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(settings.getTimeout());
+            connection.setReadTimeout(settings.getTimeout());
 
             long startTime = System.currentTimeMillis();
             connection.connect();
