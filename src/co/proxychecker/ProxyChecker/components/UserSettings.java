@@ -1,6 +1,12 @@
 package co.proxychecker.ProxyChecker.components;
 
+import javafx.util.Pair;
+
 import java.net.Proxy;
+import java.util.ArrayList;
+import java.util.List;
+
+import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
 
 /**
  * Manages the user configurable system settings
@@ -12,6 +18,8 @@ public class UserSettings {
     private String ip = "0.0.0.0"; // ip address of the user
     private Proxy.Type type = java.net.Proxy.Type.HTTP;
 
+    private List<Pair<ProxyAnonymity, String>> colorScheme = new ArrayList<>();
+
     /**
      * Creates a new UserSettings object
      * @param timeout - int the timeout for web requests
@@ -20,6 +28,11 @@ public class UserSettings {
     public UserSettings(int timeout, int threads) {
         this.setTimeout(timeout);
         this.setThreads(threads);
+
+        colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#32CC32"));
+        colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#F4FF00"));
+        colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#F37D83"));
+
     }
 
     /**
@@ -93,4 +106,21 @@ public class UserSettings {
     public Proxy.Type getProxyType() {
         return this.type;
     }
+
+    /**
+     * Gets the color scheme for the proxy table
+     * @return List
+     */
+    public List<Pair<ProxyAnonymity, String>> getColorScheme() {
+        return colorScheme;
+    }
+
+    /**
+     * Sets the color scheme for the proxy table
+     * @param colorScheme
+     */
+    public void setColorScheme(List<Pair<ProxyAnonymity, String>> colorScheme) {
+        this.colorScheme = colorScheme;
+    }
+
 }
