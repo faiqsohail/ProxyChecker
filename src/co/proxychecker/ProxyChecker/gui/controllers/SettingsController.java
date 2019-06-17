@@ -2,20 +2,22 @@ package co.proxychecker.ProxyChecker.gui.controllers;
 
 import java.net.URL;
 import java.net.Proxy;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
+import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 
 import co.proxychecker.ProxyChecker.gui.AlertBox;
 import co.proxychecker.ProxyChecker.components.Settings;
 import co.proxychecker.ProxyChecker.components.UserSettings;
+import javafx.scene.paint.Color;
+import javafx.util.Pair;
 
 /**
  * Controller for Settings.fxml
@@ -34,6 +36,15 @@ public class SettingsController implements Initializable {
     @FXML
     private ComboBox<String> combo_type;
 
+    @FXML
+    private ColorPicker color_elite;
+
+    @FXML
+    private ColorPicker color_anonymous;
+
+    @FXML
+    private ColorPicker color_transparent;
+
     private UserSettings settings = Settings.getConfig();
 
     @Override
@@ -47,6 +58,19 @@ public class SettingsController implements Initializable {
         combo_type.getSelectionModel().select(settings.getProxyType().toString());
         field_timeout.setText(String.valueOf(settings.getTimeout()));
         field_threads.setText(String.valueOf(settings.getThreads()));
+        for(Pair<ProxyAnonymity, String> p : settings.getColorScheme()) {
+            switch (p.getKey()) {
+                case ELITE:
+                    color_elite.setValue(Color.web(p.getValue()));
+                    break;
+                case ANONYMOUS:
+                    color_anonymous.setValue(Color.web(p.getValue()));
+                    break;
+                case TRANSPARENT:
+                    color_transparent.setValue(Color.web(p.getValue()));
+                    break;
+            }
+        }
 
         combo_type.getSelectionModel().selectedItemProperty().addListener(new ChangeListener<String>() {
             @Override
@@ -104,8 +128,30 @@ public class SettingsController implements Initializable {
         }
     }
 
+    @FXML
+    private void button_save_color_action() {
+        List<Pair<ProxyAnonymity, String>> newScheme = new ArrayList<>();
+        newScheme.add(new Pair<>(ProxyAnonymity.ELITE,
+                "#" + Integer.toHexString(color_elite.getValue().hashCode()).substring(0,6)));
+        newScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS,
+                "#" + Integer.toHexString(color_anonymous.getValue().hashCode()).substring(0,6)));
+        newScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT,
+                "#" + Integer.toHexString(color_transparent.getValue().hashCode()).substring(0,6)));
+
+        settings.setColorScheme(newScheme);
+        if(Settings.saveConfig(settings)) {
+            AlertBox.show(Alert.AlertType.INFORMATION, "Changes Saved",
+                    "The changes made have been saved to disk!\n\n" +
+                            "Restart the application for the changes to take effect.");
+            button_save.setDisable(true);
+        } else {
+            AlertBox.show(Alert.AlertType.ERROR, "Save Failed",
+                    "Unable to save the configuration file onto disk!");
+        }
+    }
+
     /**
-     * Determines whether or not if any setting value has been changed
+     * Determines whether or not if any proxy setting value has been changed
      * @return Boolean - Settings have been changed
      */
     private boolean settingsChanged() {
