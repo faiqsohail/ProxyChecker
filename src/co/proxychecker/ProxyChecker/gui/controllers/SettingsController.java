@@ -141,8 +141,7 @@ public class SettingsController implements Initializable {
         settings.setColorScheme(newScheme);
         if(Settings.saveConfig(settings)) {
             AlertBox.show(Alert.AlertType.INFORMATION, "Changes Saved",
-                    "The changes made have been saved to disk!\n\n" +
-                            "Restart the application for the changes to take effect.");
+                    "The changes made have been saved to disk!");
             button_save.setDisable(true);
         } else {
             AlertBox.show(Alert.AlertType.ERROR, "Save Failed",
