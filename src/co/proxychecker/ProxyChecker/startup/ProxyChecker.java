@@ -1,11 +1,17 @@
 package co.proxychecker.ProxyChecker.startup;
 
+import java.awt.*;
 import java.io.IOException;
+import java.net.URL;
 
 import javax.imageio.ImageIO;
+
+import co.proxychecker.ProxyChecker.components.UpdateChecker;
 import com.sun.javafx.PlatformUtil;
 
 import javafx.scene.Scene;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.stage.Stage;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.image.Image;
@@ -37,6 +43,35 @@ public class ProxyChecker extends Application {
                             getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/assets/icon.png")
                     )
             );
+        }
+
+        UpdateChecker checker = new UpdateChecker();
+        if(checker.isUpdateAvailable()) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setHeaderText("Update");
+            alert.setTitle("A new update is available!");
+            alert.setContentText("A new update for " + Settings.getApplicationName() +
+                    " is available would you like to download it now? \n\n" +
+                    "Current Version: " + Settings.getApplicationVersion() + "\n" +
+                    "New Version: " + checker.getRepoVersion());
+            alert.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+            alert.showAndWait().ifPresent(type -> {
+                if (type == ButtonType.YES) {
+                    try {
+                        Desktop.getDesktop().browse(new URL(Settings.getApplicationUrl()).toURI());
+                        System.exit(0);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    Alert alert2 = new Alert(Alert.AlertType.WARNING);
+                    alert2.setHeaderText("Notice");
+                    alert2.setContentText("Support is not provided for outdated versions of the application.\n\n" +
+                            "Outdated version(s) of the application may cease to work at anytime. ");
+                    alert2.showAndWait();
+                }
+            });
+
         }
 
         try {
