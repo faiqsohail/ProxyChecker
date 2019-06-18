@@ -83,8 +83,9 @@ public class RequestAPI {
             } else {
                 connection = (HttpURLConnection) new URL(this.get_query_url(settings.getIp())).openConnection(proxy);
             }
-            connection.setRequestProperty("User-Agent", "Proxy Checker - (proxychecker.co) : " +
-                    System.getProperty("os.name") + " v." + System.getProperty("os.version"));
+            connection.setRequestProperty("User-Agent", "Proxy Checker v." + Settings.getApplicationVersion() +
+                    " - (proxychecker.co) : " + System.getProperty("os.name") +
+                    " v." + System.getProperty("os.version"));
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(settings.getTimeout());
             connection.setReadTimeout(settings.getTimeout());

@@ -28,7 +28,7 @@ public class AboutController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        name.setText(Settings.getApplicationName());
+        name.setText(Settings.getApplicationName() + " v." + Settings.getApplicationVersion());
         hyperlink.setText(Settings.getApplicationUrl().substring(8));
         hyperlink.setOnAction(new EventHandler<ActionEvent>() { 
             @Override
