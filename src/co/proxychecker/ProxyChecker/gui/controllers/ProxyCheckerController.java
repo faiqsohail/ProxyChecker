@@ -30,7 +30,9 @@ import co.proxychecker.ProxyChecker.commands.ProxyCheckCommand;
 import co.proxychecker.ProxyChecker.components.entities.ProxyStatus;
 import co.proxychecker.ProxyChecker.gui.events.ProxyCheckerKeyEvent;
 import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
+import javafx.scene.paint.Color;
 import javafx.util.Callback;
+import javafx.util.Pair;
 
 /**
  * Controller for ProxyChecker.fxml
@@ -102,13 +104,13 @@ public class ProxyCheckerController implements Initializable {
                     setStyle("");
                 } else {
                     ProxyAnonymity anonymity = proxy.getProxyAnonymity();
-                    if(anonymity == ProxyAnonymity.ELITE) {
-                        setStyle("-fx-background-color: #32CC32;");
-                    } else if(anonymity == ProxyAnonymity.ANONYMOUS) {
-                        setStyle("-fx-background-color: #F4FF00;");
-                    } else if (anonymity == ProxyAnonymity.TRANSPARENT) {
-                        setStyle("-fx-background-color: #F37D83;");
+
+                    for(Pair<ProxyAnonymity, String> p : Settings.getConfig().getColorScheme()) {
+                        if(p.getKey() == anonymity) {
+                            setStyle("-fx-background-color: "+ p.getValue() + ";");
+                        }
                     }
+
                 }
             }
         });
