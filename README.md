@@ -4,7 +4,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 
 Main Window
 
-![Image of ProxyChecker](https://github.com/HiddenMotives/ProxyChecker-Website/blob/master/preview.gif)
+![Image of ProxyChecker](showcase/preview_main.gif)
 
 
 Preferences Window
