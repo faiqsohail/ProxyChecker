@@ -29,9 +29,9 @@ public class UserSettings {
         this.setTimeout(timeout);
         this.setThreads(threads);
 
-        colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#32CC32"));
-        colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#F4FF00"));
-        colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#F37D83"));
+        colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#b3e6b3"));
+        colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#e6e6b3"));
+        colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#ffb3b3"));
 
     }
 
