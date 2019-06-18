@@ -2,14 +2,9 @@
 An easy to use open-source, multithreaded Proxy Checker.
 Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for Windows, Mac OS, Linux.
 
-Main Window
 
-![Image of ProxyChecker](https://github.com/HiddenMotives/ProxyChecker-Website/blob/master/preview.gif)
+![Image of ProxyChecker](showcase/preview_main.gif)
 
-
-Preferences Window
-
-![Image of ProxyChecker Preferences](https://i.imgur.com/wejFQWT.png)
 
 
 
