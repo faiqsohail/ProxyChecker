@@ -30,6 +30,16 @@ Simply download the latest packaged release for your system and run!
 * Windows (.exe), Mac OS (.dmg), Other (.jar)
 
 
+### Build from Source
+You may also build and run ProxyChecker from the master branch with the included makefile.
+```
+wget https://github.com/HiddenMotives/ProxyChecker/archive/master.zip
+unzip master.zip
+make -C ProxyChecker-master/
+java -jar ProxyChecker-master/artifact/ProxyChecker.jar
+```
+
+
 
 --
 <sub><sup>
