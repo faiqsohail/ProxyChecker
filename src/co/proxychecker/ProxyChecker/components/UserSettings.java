@@ -22,16 +22,14 @@ public class UserSettings {
 
     /**
      * Creates a new UserSettings object
-     * @param timeout - int the timeout for web requests
-     * @param threads - int the number of threads to use
      */
-    public UserSettings(int timeout, int threads) {
-        this.setTimeout(timeout);
-        this.setThreads(threads);
+    public UserSettings() {
+        this.setTimeout(5000);
+        this.setThreads(100);
 
-        colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#b3e6b3"));
-        colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#e6e6b3"));
-        colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#ffb3b3"));
+        this.colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#b3e6b3"));
+        this.colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#e6e6b3"));
+        this.colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#ffb3b3"));
 
     }
 
@@ -112,6 +110,9 @@ public class UserSettings {
      * @return List
      */
     public List<Pair<ProxyAnonymity, String>> getColorScheme() {
+        if(colorScheme == null) {
+            Settings.saveConfig(new UserSettings());
+        }
         return colorScheme;
     }
 

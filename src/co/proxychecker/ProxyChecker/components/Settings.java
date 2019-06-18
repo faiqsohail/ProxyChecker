@@ -11,8 +11,10 @@ import com.google.gson.stream.JsonReader;
  */
 public class Settings {
 
+    private static final String APPLICATION_VERSION = "1.0";
     private static final String APPLICATION_NAME = "Proxy Checker";
     private static final String APPLICATION_URL = "https://proxychecker.co";
+    private static final String APPLICATION_REPO = "https://github.com/HiddenMotives/ProxyChecker/";
 
     public static String getApplicationName() {
         return APPLICATION_NAME;
@@ -58,7 +60,7 @@ public class Settings {
     public static File getConfigFile() {
         File file = new File(getSettingsFolder().getAbsolutePath() + File.separator + "config.json");
         if(!file.exists()) {
-            if(!saveConfig(new UserSettings(5000,100))) {
+            if(!saveConfig(new UserSettings())) {
                 throw new RuntimeException("Unable to save default config.json!");
             }
         }
@@ -81,6 +83,22 @@ public class Settings {
             }
         }
         return file;
+    }
+
+    /**
+     * Gets the current released version of this application
+     * @return version
+     */
+    public static String getApplicationVersion() {
+        return APPLICATION_VERSION;
+    }
+
+    /**
+     * Gets the main repo of this project
+     * @return
+     */
+    public static String getApplicationRepo() {
+        return APPLICATION_REPO;
     }
 
 
