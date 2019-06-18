@@ -36,15 +36,6 @@ public class ProxyChecker extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception {
 
-        if (PlatformUtil.isMac()) {
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            com.apple.eawt.Application.getApplication().setDockIconImage(
-                    ImageIO.read(
-                            getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/assets/icon.png")
-                    )
-            );
-        }
-
         UpdateChecker checker = new UpdateChecker();
         if(checker.isUpdateAvailable()) {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
