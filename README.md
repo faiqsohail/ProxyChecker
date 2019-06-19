@@ -32,6 +32,7 @@ Simply download the latest packaged release for your system and run!
 
 ### Build from Source
 You may also build and run ProxyChecker from the master branch with the included makefile.
+This assumes you have Java setup correctly with JavaFX accessible by your JDK.
 ```
 wget https://github.com/HiddenMotives/ProxyChecker/archive/master.zip
 unzip master.zip
