@@ -9,7 +9,7 @@ main: all clean
 all:
 	mkdir -p out
 	mkdir -p artifact
-	wget -N http://central.maven.org/maven2/com/google/code/gson/gson/2.8.5/gson-2.8.5.jar
+	wget -N https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.5/gson-2.8.5.jar
 	find . -name "*.java" -print | xargs $(JCC) $(JFLAGS)
 	jar xf gson-2.8.5.jar
 	cp -R com out/
