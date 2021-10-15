@@ -5,13 +5,13 @@ As ProxyChecker is an open-source project your contribution helps the project th
 
 ### Reporting Bugs
 
-When reporting a Bug please be sure to follow the [Bug Report Template](https://github.com/HiddenMotives/ProxyChecker/issues/new?assignees=&labels=&template=bug_report.md&title=) 
+When reporting a Bug please be sure to follow the [Bug Report Template](https://github.com/faiqsohail/ProxyChecker/issues/new?assignees=&labels=&template=bug_report.md&title=) 
 and provide as much detail as possible.
 
 
 ### Suggesting Enhancements
 
-To suggest a feature or enhancement use the [Feature Request Template](https://github.com/HiddenMotives/ProxyChecker/issues/new?assignees=&labels=&template=feature_request.md&title=),
+To suggest a feature or enhancement use the [Feature Request Template](https://github.com/faiqsohail/ProxyChecker/issues/new?assignees=&labels=&template=feature_request.md&title=),
 be sure your request is inline with the scope of the project.
 
 ### Writing Code
