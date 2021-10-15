@@ -24,7 +24,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 
 ### Installation & Usage
 Simply download the latest packaged release for your system and run!
-* [Latest Release](https://github.com/HiddenMotives/ProxyChecker/releases/latest)
+* [Latest Release](https://github.com/faiqsohail/ProxyChecker/releases/latest)
 * Windows (.exe), Mac OS (.dmg), Other (.jar)
 
 
