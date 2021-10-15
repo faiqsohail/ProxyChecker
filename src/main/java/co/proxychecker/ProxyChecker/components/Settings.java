@@ -14,7 +14,7 @@ public class Settings {
     private static final String APPLICATION_VERSION = "1.1";
     private static final String APPLICATION_NAME = "Proxy Checker";
     private static final String APPLICATION_URL = "https://proxychecker.co";
-    private static final String APPLICATION_REPO = "https://github.com/HiddenMotives/ProxyChecker/";
+    private static final String APPLICATION_REPO = "https://github.com/faiqsohail/ProxyChecker/";
 
     public static String getApplicationName() {
         return APPLICATION_NAME;
