@@ -4,7 +4,6 @@ COPY . .
 RUN mvn package -f pom.xml
 
 FROM openjdk:11-jre-slim as runner
-
 WORKDIR /app
 
 RUN apt-get update \
@@ -12,4 +11,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/ProxyChecker.jar ./ProxyChecker.jar
+
 CMD ["java", "-jar", "ProxyChecker.jar"]
