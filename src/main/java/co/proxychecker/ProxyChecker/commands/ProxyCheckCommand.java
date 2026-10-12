@@ -3,8 +3,9 @@ package co.proxychecker.ProxyChecker.commands;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -84,7 +85,29 @@ public final class ProxyCheckCommand {
         }
 
         AtomicInteger remaining = new AtomicInteger(toCheck.size());
-        ExecutorService pool = Executors.newFixedThreadPool(settings.getThreads(), runnable -> {
+        Queue<Proxy> pending = new ConcurrentLinkedQueue<>();
+        AtomicBoolean flushScheduled = new AtomicBoolean(false);
+        // results are delivered in batches: at most one UI update is queued at a time, instead of one
+        // Platform.runLater per proxy which floods the FX thread and re-renders the table per row
+        Runnable flush = () -> {
+            flushScheduled.set(false);
+            List<Proxy> batch = new ArrayList<>();
+            Proxy next;
+            while ((next = pending.poll()) != null) {
+                batch.add(next);
+            }
+            if (!batch.isEmpty()) {
+                onResults.accept(batch);
+                if (remaining.addAndGet(-batch.size()) == 0) {
+                    RUNNING.set(false);
+                    onComplete.run();
+                }
+            }
+        };
+
+        // no point starting more threads than there are proxies
+        int threads = Math.max(1, Math.min(settings.getThreads(), toCheck.size()));
+        ExecutorService pool = Executors.newFixedThreadPool(threads, runnable -> {
             Thread thread = new Thread(runnable, "proxy-checker");
             thread.setDaemon(true);
             return thread;
@@ -98,13 +121,10 @@ public final class ProxyCheckCommand {
                     LOG.log(Level.WARNING, "Unexpected error checking " + proxy.getIp() + ":" + proxy.getPort(), e);
                     markDead(proxy);
                 }
-                uiExecutor.execute(() -> {
-                    onResults.accept(Collections.singletonList(proxy));
-                    if (remaining.decrementAndGet() == 0) {
-                        RUNNING.set(false);
-                        onComplete.run();
-                    }
-                });
+                pending.add(proxy);
+                if (flushScheduled.compareAndSet(false, true)) {
+                    uiExecutor.execute(flush);
+                }
             });
         }
         pool.shutdown();
