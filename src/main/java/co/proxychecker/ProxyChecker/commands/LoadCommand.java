@@ -1,6 +1,11 @@
 package co.proxychecker.ProxyChecker.commands;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.List;
 
 import javafx.scene.control.Alert;
@@ -23,12 +28,12 @@ public class LoadCommand {
         list = list == null ? FileCommand.getFilesToOpen() : list;
         if (list != null) {
             for (File file : list) {
-                try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                try (BufferedReader br = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
                     String line;
                     while ((line = br.readLine()) != null) {
                         addItem(line, view); // only add if its a valid line
                     }
-                } catch (FileNotFoundException e) {
+                } catch (NoSuchFileException e) {
                     AlertBox.show(Alert.AlertType.INFORMATION, "File Not Found",
                             "The file you selected: " + file.getName() + ", doesn't seem to exist!");
                 } catch (IOException e) {
@@ -46,7 +51,7 @@ public class LoadCommand {
      * @param view - The ListView to add the string onto.
      */
     public static void string(String string, ListView<String> view) {
-        if(view.getItems().contains(string)) {
+        if(view.getItems().contains(normalize(string))) {
             AlertBox.show(Alert.AlertType.INFORMATION,"Already Loaded",
                     "The proxy you entered is already loaded and is ready to be checked!");
         } else if(!addItem(string, view)) { // make sure it was added
@@ -56,14 +61,26 @@ public class LoadCommand {
     }
 
     /**
+     * Trims whitespace and a UTF-8 byte order mark, so "1.2.3.4:80 " and "1.2.3.4:80" are the same proxy.
+     */
+    static String normalize(String line) {
+        String value = line.trim();
+        if (!value.isEmpty() && value.charAt(0) == '\uFEFF') {
+            value = value.substring(1).trim();
+        }
+        return value;
+    }
+
+    /**
      * Adds a string onto the listview provided its in a valid format
      * @param string - The String to add to the ListView
      * @param view - The ListView to add the string onto.
      * @return Boolean - Whether addition of item onto the listview was successful
      */
     private static boolean addItem(String string, ListView<String> view) {
-        if( (Proxy.isValidFormat(string)) && (!view.getItems().contains(string))) {
-            return view.getItems().add(string);
+        String value = normalize(string);
+        if( (Proxy.isValidFormat(value)) && (!view.getItems().contains(value))) {
+            return view.getItems().add(value);
         }
         return false;
     }

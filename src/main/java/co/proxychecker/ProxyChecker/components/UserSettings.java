@@ -1,127 +1,120 @@
 package co.proxychecker.ProxyChecker.components;
 
-import javafx.util.Pair;
-
 import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 
+import co.proxychecker.ProxyChecker.components.entities.AnonymityColor;
 import co.proxychecker.ProxyChecker.components.entities.ProxyAnonymity;
 
 /**
- * Manages the user configurable system settings
+ * Manages the user configurable system settings.
  */
 public class UserSettings {
 
-    private int timeout; // timeout for checking the proxy
-    private int threads; // max threads
+    public static final int DEFAULT_TIMEOUT = 5000;
+    public static final int MIN_TIMEOUT = 500;
+    public static final int DEFAULT_THREADS = 100;
+    public static final int MIN_THREADS = 1;
+    public static final int MAX_THREADS = 1000;
+
+    private int timeout = DEFAULT_TIMEOUT; // timeout for checking the proxy (ms)
+    private int threads = DEFAULT_THREADS; // max threads
     private String ip = "0.0.0.0"; // ip address of the user
-    private Proxy.Type type = java.net.Proxy.Type.HTTP;
+    private Proxy.Type type = Proxy.Type.HTTP;
 
-    private List<Pair<ProxyAnonymity, String>> colorScheme = new ArrayList<>();
+    private List<AnonymityColor> colorScheme = defaultColorScheme();
 
-    /**
-     * Creates a new UserSettings object
-     */
-    public UserSettings() {
-        this.setTimeout(5000);
-        this.setThreads(100);
-
-        this.colorScheme.add(new Pair<>(ProxyAnonymity.ELITE, "#b3e6b3"));
-        this.colorScheme.add(new Pair<>(ProxyAnonymity.ANONYMOUS, "#e6e6b3"));
-        this.colorScheme.add(new Pair<>(ProxyAnonymity.TRANSPARENT, "#ffb3b3"));
-
+    private static List<AnonymityColor> defaultColorScheme() {
+        List<AnonymityColor> scheme = new ArrayList<>();
+        scheme.add(new AnonymityColor(ProxyAnonymity.ELITE, "#b3e6b3"));
+        scheme.add(new AnonymityColor(ProxyAnonymity.ANONYMOUS, "#e6e6b3"));
+        scheme.add(new AnonymityColor(ProxyAnonymity.TRANSPARENT, "#ffb3b3"));
+        return scheme;
     }
 
     /**
-     * Gets the current IP address of the user
-     * @return String - IP address
+     * Repairs values that are missing or out of range (e.g. from a hand edited or older
+     * configuration file) so the rest of the application never sees invalid settings.
+     *
+     * @return this
      */
+    public UserSettings sanitize() {
+        if (timeout < MIN_TIMEOUT) {
+            timeout = DEFAULT_TIMEOUT;
+        }
+        if (threads < MIN_THREADS) {
+            threads = DEFAULT_THREADS;
+        } else if (threads > MAX_THREADS) {
+            threads = MAX_THREADS;
+        }
+        if (type == null || type == Proxy.Type.DIRECT) {
+            type = Proxy.Type.HTTP;
+        }
+        if (ip == null) {
+            ip = "0.0.0.0";
+        }
+        if (colorScheme == null) {
+            colorScheme = defaultColorScheme();
+        } else {
+            colorScheme.removeIf(c -> c == null || c.getAnonymity() == null || c.getColor() == null);
+        }
+        return this;
+    }
+
     public String getIp() {
-        return this.ip;
+        return ip;
     }
 
-    /**
-     * Gets the current maximum threads allowed to be spawned
-     * @return int - number of threads
-     */
-    public int getThreads() {
-        return threads;
-    }
-
-    /**
-     * Gets the timeout for web requests
-     * @return int - the timeout
-     */
-    public int getTimeout() {
-        return timeout;
-    }
-
-    /**
-     * Sets the current users IP address
-     * @param ip - String IP address
-     * @return UserSettings
-     */
     public UserSettings setIp(String ip) {
         this.ip = ip;
         return this;
     }
 
-    /**
-     * Sets the current preferred timeout for web requests
-     * @param timeout - int
-     * @return UserSettings
-     */
-    public UserSettings setTimeout(int timeout) {
-        this.timeout = timeout;
-        return this;
+    public int getThreads() {
+        return threads;
     }
 
-    /**
-     * Sets the preffered maximum threads allowed to be spawned
-     * @param threads - int
-     * @return UserSettings
-     */
     public UserSettings setThreads(int threads) {
         this.threads = threads;
         return this;
     }
 
-    /**
-     * Sets the default proxy type that will be checked
-     * @param type - java.net.Proxy.Type (HTTP or SOCKS)
-     * @return UserSettings
-     */
+    public int getTimeout() {
+        return timeout;
+    }
+
+    public UserSettings setTimeout(int timeout) {
+        this.timeout = timeout;
+        return this;
+    }
+
+    public Proxy.Type getProxyType() {
+        return type;
+    }
+
     public UserSettings setProxyType(Proxy.Type type) {
         this.type = type;
         return this;
     }
 
-    /**
-     * Gets the default proxy type that will be checked
-     * @return java.net.Proxy.Type
-     */
-    public Proxy.Type getProxyType() {
-        return this.type;
-    }
-
-    /**
-     * Gets the color scheme for the proxy table
-     * @return List
-     */
-    public List<Pair<ProxyAnonymity, String>> getColorScheme() {
-        if(colorScheme == null) {
-            Settings.saveConfig(new UserSettings());
-        }
+    public List<AnonymityColor> getColorScheme() {
         return colorScheme;
     }
 
     /**
-     * Sets the color scheme for the proxy table
-     * @param colorScheme
+     * @return the configured color for the given anonymity, or null if none is configured
      */
-    public void setColorScheme(List<Pair<ProxyAnonymity, String>> colorScheme) {
-        this.colorScheme = colorScheme;
+    public String getColor(ProxyAnonymity anonymity) {
+        for (AnonymityColor color : colorScheme) {
+            if (color.getAnonymity() == anonymity) {
+                return color.getColor();
+            }
+        }
+        return null;
     }
 
+    public void setColorScheme(List<AnonymityColor> colorScheme) {
+        this.colorScheme = colorScheme;
+    }
 }

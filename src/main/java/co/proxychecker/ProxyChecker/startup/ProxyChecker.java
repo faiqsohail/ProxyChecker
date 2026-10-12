@@ -1,33 +1,30 @@
 package co.proxychecker.ProxyChecker.startup;
 
-import java.awt.*;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import javax.imageio.ImageIO;
-
-import co.proxychecker.ProxyChecker.components.UpdateChecker;
-import com.sun.javafx.PlatformUtil;
-
-import javafx.scene.Scene;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.stage.Stage;
+import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.layout.VBox;
-import javafx.stage.WindowEvent;
-import javafx.event.EventHandler;
-import javafx.scene.control.Alert;
-import javafx.application.Application;
+import javafx.stage.Stage;
 
-import co.proxychecker.ProxyChecker.gui.AlertBox;
-import co.proxychecker.ProxyChecker.components.Settings;
 import co.proxychecker.ProxyChecker.components.RequestAPI;
+import co.proxychecker.ProxyChecker.components.Settings;
+import co.proxychecker.ProxyChecker.components.UpdateChecker;
 import co.proxychecker.ProxyChecker.components.UserSettings;
-
+import co.proxychecker.ProxyChecker.gui.AlertBox;
+import co.proxychecker.ProxyChecker.gui.Browser;
 
 public class ProxyChecker extends Application {
+
+    private static final Logger LOG = Logger.getLogger(ProxyChecker.class.getName());
 
     public static void main(String[] args) {
         launch(args);
@@ -35,73 +32,93 @@ public class ProxyChecker extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
+        Browser.init(getHostServices());
 
-        UpdateChecker checker = new UpdateChecker();
-        if(checker.isUpdateAvailable()) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setHeaderText("Update");
-            alert.setTitle("A new update is available!");
-            alert.setContentText("A new update for " + Settings.getApplicationName() +
-                    " is available would you like to download it now? \n\n" +
-                    "Current Version: " + Settings.getApplicationVersion() + "\n" +
-                    "New Version: " + checker.getRepoVersion());
-            alert.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
-            alert.showAndWait().ifPresent(type -> {
-                if (type == ButtonType.YES) {
-                    try {
-                        Desktop.getDesktop().browse(new URL(Settings.getApplicationUrl()).toURI());
-                        System.exit(0);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    Alert alert2 = new Alert(Alert.AlertType.WARNING);
-                    alert2.setHeaderText("Notice");
-                    alert2.setContentText("Support is not provided for outdated versions of the application.\n\n" +
-                            "Outdated version(s) of the application may cease to work at anytime. ");
-                    alert2.showAndWait();
-                }
-            });
-
+        if (promptForUpdate()) {
+            return;
         }
 
-        try {
-            UserSettings settings = Settings.getConfig();
-            RequestAPI requestAPI = new RequestAPI(settings);
-            String ip = requestAPI.getResponse(requestAPI.connect(null).getKey()).ip;
-
-            if(!settings.getIp().equals(ip)) {
-                Settings.saveConfig(settings.setIp(ip));
-            }
-
-            FXMLLoader fxmlLoader = new FXMLLoader();
-            VBox root = fxmlLoader.load(
-                    getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/gui/ProxyChecker.fxml")
-            );
-            Scene scene = new Scene(root);
-            primaryStage.getIcons().add(new Image(
-                    getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/assets/icon.png"))
-            );
-            primaryStage.setScene(scene);
-            primaryStage.setTitle(Settings.getApplicationName());
-            primaryStage.show();
-
-        } catch (IOException | NullPointerException e) {
+        UserSettings settings = Settings.getConfig();
+        String ip = fetchPublicIp(settings);
+        if (ip == null) {
             AlertBox.show(
                     Alert.AlertType.ERROR,
                     "Service Down",
-                    "Unable to get current public IP address, " +
-                            "will not be able to determine proxy status and anonymity!\n\n" +
-                            "Check your internet connection and try again later, you may also visit " +
-                            Settings.getApplicationUrl() + " for support."
+                    "Unable to get current public IP address, "
+                            + "will not be able to determine proxy status and anonymity!\n\n"
+                            + "Check your internet connection and try again later, you may also visit "
+                            + Settings.getApplicationUrl() + " for support."
             );
+            return;
+        }
+        if (!ip.equals(settings.getIp())) {
+            Settings.saveConfig(settings.setIp(ip));
         }
 
-        primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
-            @Override
-            public void handle(WindowEvent event) {
-                System.exit(0);
-            }
+        FXMLLoader fxmlLoader = new FXMLLoader();
+        VBox root;
+        try (InputStream fxml = getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/gui/ProxyChecker.fxml")) {
+            root = fxmlLoader.load(fxml);
+        }
+        primaryStage.setScene(new Scene(root));
+        primaryStage.getIcons().add(new Image(
+                getClass().getResourceAsStream("/co/proxychecker/ProxyChecker/assets/icon.png")));
+        primaryStage.setTitle(Settings.getApplicationName());
+        primaryStage.setOnCloseRequest(event -> {
+            Platform.exit();
+            System.exit(0);
         });
+        primaryStage.show();
+    }
+
+    /**
+     * Notifies the user if a newer version is available.
+     *
+     * @return true if the user chose to download the update and the application should quit
+     */
+    private boolean promptForUpdate() {
+        UpdateChecker checker = new UpdateChecker();
+        if (!checker.isUpdateAvailable()) {
+            return false;
+        }
+        String repoVersion;
+        try {
+            repoVersion = checker.getRepoVersion();
+        } catch (IOException e) {
+            return false;
+        }
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setHeaderText("Update");
+        alert.setTitle("A new update is available!");
+        alert.setContentText("A new update for " + Settings.getApplicationName()
+                + " is available would you like to download it now? \n\n"
+                + "Current Version: " + Settings.getApplicationVersion() + "\n"
+                + "New Version: " + repoVersion);
+        alert.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+        boolean download = alert.showAndWait().filter(type -> type == ButtonType.YES).isPresent();
+        if (download) {
+            Browser.open(Settings.getApplicationRepo() + "releases/latest");
+            Platform.exit();
+            return true;
+        }
+        Alert notice = new Alert(Alert.AlertType.WARNING);
+        notice.setHeaderText("Notice");
+        notice.setContentText("Support is not provided for outdated versions of the application.\n\n"
+                + "Outdated version(s) of the application may cease to work at anytime. ");
+        notice.showAndWait();
+        return false;
+    }
+
+    /**
+     * @return the user's public IP address as seen by the API server, or null if it can't be determined
+     */
+    private static String fetchPublicIp(UserSettings settings) {
+        try {
+            String ip = new RequestAPI(settings).request(null).getResponse().ip;
+            return (ip == null || ip.trim().isEmpty()) ? null : ip.trim();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Unable to determine public IP address", e);
+            return null;
+        }
     }
 }

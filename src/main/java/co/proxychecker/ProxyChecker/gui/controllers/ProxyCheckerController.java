@@ -1,6 +1,8 @@
 package co.proxychecker.ProxyChecker.gui.controllers;
 
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
 import javafx.beans.value.ObservableValue;
@@ -75,12 +77,12 @@ public class ProxyCheckerController implements Initializable {
     @FXML
     private ProgressBar progressBar;
 
-    private Boolean notifyCompleted;
+    private int totalToCheck;
+    private int workingProxies;
 
 
     @Override
     public void initialize(URL location, ResourceBundle resourceBundle) {
-        notifyCompleted = false;
         // set users IP address on label
         label_ip_address.setText(Settings.getConfig().getIp());
 
@@ -103,40 +105,8 @@ public class ProxyCheckerController implements Initializable {
                 if ((proxy == null) || (proxy.getProxyStatus() == ProxyStatus.DEAD))  {
                     setStyle("");
                 } else {
-                    ProxyAnonymity anonymity = proxy.getProxyAnonymity();
-
-                    for(Pair<ProxyAnonymity, String> p : Settings.getConfig().getColorScheme()) {
-                        if(p.getKey() == anonymity) {
-                            setStyle("-fx-background-color: "+ p.getValue() + ";");
-                        }
-                    }
-
-                }
-            }
-        });
-
-        // manage progress bar and count for working proxies and checked proxies
-        table_proxy.getItems().addListener(new ListChangeListener<Proxy>() {
-            @Override
-            public void onChanged(Change<? extends Proxy> c) {
-                if(!c.getList().isEmpty()) {
-                    Proxy proxy = c.getList().get(c.getList().size()-1); // newest added proxy
-                    label_checked_proxies.setText("Checked Proxies: " + String.valueOf(c.getList().size()));
-                    if((c.getList().size() == view_loaded_proxies.getItems().size())) {
-                        progressBar.setProgress(0f);
-                        button_check.setDisable(false); // disable check button until all proxies are checked
-                        if(!notifyCompleted) {
-                            AlertBox.show(Alert.AlertType.INFORMATION, "Task Completed",
-                                    "Proxy Checker has finished checking your proxies!");
-                            notifyCompleted = true;
-                        }
-                    } else {
-                        progressBar.setProgress((float) c.getList().size() / view_loaded_proxies.getItems().size());
-                    }
-                    if(proxy.getProxyStatus() == ProxyStatus.ALIVE) {
-                        int current_working = Integer.parseInt(label_working_proxies.getText().split(":")[1].trim());
-                        label_working_proxies.setText("Working Proxies: " + String.valueOf(current_working+1));
-                    }
+                    String color = Settings.getConfig().getColor(proxy.getProxyAnonymity());
+                    setStyle(color == null ? "" : "-fx-background-color: " + color + ";");
                 }
             }
         });
@@ -157,9 +127,13 @@ public class ProxyCheckerController implements Initializable {
         view_loaded_proxies.setOnDragDropped(new EventHandler<DragEvent>() {
             @Override
             public void handle(DragEvent event) {
-                if(event.getDragboard().hasFiles()) {
+                boolean loaded = false;
+                if(event.getDragboard().hasFiles() && !ProxyCheckCommand.isRunning()) {
                     LoadCommand.file(view_loaded_proxies, event.getDragboard().getFiles());
+                    loaded = true;
                 }
+                event.setDropCompleted(loaded);
+                event.consume();
             }
         });
 
@@ -190,19 +164,47 @@ public class ProxyCheckerController implements Initializable {
      */
     @FXML
     private void button_check_action() {
-        if(view_loaded_proxies.getItems().size() > 0) { // make sure there are proxies loaded to check
-            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-            label_working_proxies.setText("Working Proxies: 0"); // reset working proxy count
-            table_proxy.getItems().clear(); // reset table
-            field_input.requestFocus();
-            button_check.setDisable(true);
-            ProxyCheckCommand.check(view_loaded_proxies, table_proxy);
-            notifyCompleted = false;
-
-        } else {
-            AlertBox.show(Alert.AlertType.INFORMATION,"No Loaded Proxies",
-                    "There are no proxies to check! To check a proxy you must load at least one first.");
+        if (ProxyCheckCommand.isRunning()) {
+            return;
         }
+        if (view_loaded_proxies.getItems().isEmpty()) { // make sure there are proxies loaded to check
+            AlertBox.show(Alert.AlertType.INFORMATION, "No Loaded Proxies",
+                    "There are no proxies to check! To check a proxy you must load at least one first.");
+            return;
+        }
+        totalToCheck = view_loaded_proxies.getItems().size();
+        workingProxies = 0;
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        label_working_proxies.setText("Working Proxies: 0");
+        label_checked_proxies.setText("Checked Proxies: 0");
+        table_proxy.getItems().clear(); // reset table
+        field_input.requestFocus();
+        button_check.setDisable(true);
+        ProxyCheckCommand.check(new ArrayList<>(view_loaded_proxies.getItems()),
+                this::onProxiesChecked, this::onCheckCompleted);
+    }
+
+    /**
+     * Adds checked proxies to the table and updates the counters and progress bar
+     */
+    private void onProxiesChecked(List<Proxy> proxies) {
+        table_proxy.getItems().addAll(proxies);
+        for (Proxy proxy : proxies) {
+            if (proxy.getProxyStatus() == ProxyStatus.ALIVE) {
+                workingProxies++;
+            }
+        }
+        int checked = table_proxy.getItems().size();
+        label_checked_proxies.setText("Checked Proxies: " + checked);
+        label_working_proxies.setText("Working Proxies: " + workingProxies);
+        progressBar.setProgress((double) checked / totalToCheck);
+    }
+
+    private void onCheckCompleted() {
+        progressBar.setProgress(0);
+        button_check.setDisable(false);
+        AlertBox.show(Alert.AlertType.INFORMATION, "Task Completed",
+                "Proxy Checker has finished checking your proxies!");
     }
 
 

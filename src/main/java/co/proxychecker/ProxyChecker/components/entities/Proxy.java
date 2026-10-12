@@ -9,6 +9,9 @@ import javafx.util.Pair;
  */
 public class Proxy {
 
+    private static final int MIN_PORT = 1;
+    private static final int MAX_PORT = 65535;
+
     private int port;
     private final String ip;
 
@@ -36,7 +39,7 @@ public class Proxy {
     public Proxy(String ip_port, Type type) {
         Pair<String, Integer> proxyPair = format(ip_port);
         if(proxyPair == null) {
-            throw new RuntimeException("Proxy() called with a invalid formatted string!");
+            throw new IllegalArgumentException("Invalid proxy format, expected host:port but got: " + ip_port);
         } else {
             this.ip = proxyPair.getKey();
             this.port = proxyPair.getValue();
@@ -67,12 +70,19 @@ public class Proxy {
      *          and the Port as the Value
      */
     private static Pair<String, Integer> format(String ip_port) {
-        String[] explode = ip_port.split(":");
-        if(explode.length == 2) {
+        if (ip_port == null) {
+            return null;
+        }
+        String[] explode = ip_port.trim().split(":");
+        if (explode.length == 2) {
+            String host = explode[0].trim();
             try {
-                int port = Integer.parseInt(explode[1]);
-                return new Pair<>(explode[0], port);
-            } catch (Exception e) {
+                int port = Integer.parseInt(explode[1].trim());
+                if (host.isEmpty() || port < MIN_PORT || port > MAX_PORT) {
+                    return null;
+                }
+                return new Pair<>(host, port);
+            } catch (NumberFormatException e) {
                 return null;
             }
         }
