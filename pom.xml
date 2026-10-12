@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>co.proxychecker.ProxyChecker</groupId>
+    <groupId>co.proxychecker</groupId>
     <artifactId>ProxyChecker</artifactId>
     <version>1.2</version>
     <name>ProxyChecker</name>
@@ -15,7 +15,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- JavaFX 17 requires a Java 11+ runtime, so Java 11 is the real minimum. -->
         <maven.compiler.release>11</maven.compiler.release>
-        <main.class>co.proxychecker.ProxyChecker.startup.Launcher</main.class>
+        <main.class>co.proxychecker.startup.Launcher</main.class>
 
         <javafx.version>17.0.20</javafx.version>
         <gson.version>2.13.2</gson.version>
@@ -57,11 +57,18 @@
     <build>
         <resources>
             <resource>
+                <directory>src/main/resources</directory>
                 <filtering>false</filtering>
-                <directory>src/main/java</directory>
+                <excludes>
+                    <exclude>**/application.properties</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <!-- injects the project version, so it is only defined once (in this pom) -->
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
                 <includes>
-                    <include>**/*.fxml</include>
-                    <include>**/*.png</include>
+                    <include>**/application.properties</include>
                 </includes>
             </resource>
         </resources>

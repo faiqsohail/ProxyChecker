@@ -18,7 +18,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 * Export Table (CSV) and Export Based on Anonymity
 
 ### Requirements
-* Java 1.8+
+* Java 11+ (the packaged releases bundle JavaFX)
 * Internet Connection :)
 
 
@@ -31,12 +31,17 @@ Now also available on [Docker Hub](https://hub.docker.com/r/faiqsohail/proxychec
 
 
 ### Build from Source
-This assumes you have both Java and [Maven](https://maven.apache.org/download.cgi) setup correctly.
+This assumes you have Java 11+ (JDK) and [Maven](https://maven.apache.org/download.cgi) set up correctly.
 ```
 git clone https://github.com/faiqsohail/ProxyChecker.git
-mvn package -f ProxyChecker/pom.xml
-java -jar ProxyChecker/target/ProxyChecker.jar
+cd ProxyChecker
+mvn package                       # compiles, runs the tests and builds target/ProxyChecker.jar
+java -jar target/ProxyChecker.jar
 ```
+During development you can also run the application directly with `mvn javafx:run`, or only the tests with `mvn test`.
+
+Note: the jar bundles the JavaFX native libraries of the platform it was built on, so build it on the
+operating system you intend to run it on.
 
 
 ### Contributing
