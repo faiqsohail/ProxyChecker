@@ -97,13 +97,29 @@ class CliTest {
     private long progressInterval = 60_000;
 
     private int run(InputStream stdin, String... args) {
-        Cli cli = new Cli(stdin, new PrintStream(stdout, true), new PrintStream(stderr, true), interactive,
-                progressInterval);
+        Cli cli = new Cli(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8), interactive, progressInterval);
         return cli.run(args);
     }
 
     private int run(String... args) {
         return run(new ByteArrayInputStream(new byte[0]), args);
+    }
+
+    /**
+     * Standard error as text, with the platform line separator (CRLF on Windows, used by println)
+     * normalised to "\n" so assertions read the same on every OS. Any other '\r' is kept.
+     */
+    private String err() {
+        return normalize(stderr);
+    }
+
+    private String out() {
+        return normalize(stdout);
+    }
+
+    private static String normalize(ByteArrayOutputStream stream) {
+        return new String(stream.toByteArray(), StandardCharsets.UTF_8).replace(System.lineSeparator(), "\n");
     }
 
     private String apiUrl() {
@@ -130,7 +146,7 @@ class CliTest {
         int code = run("--cli", "-i", in.toString(), "-o", out.toString(), "--timeout", "2000",
                 "--threads", "4", "--api-url", apiUrl());
 
-        assertEquals(Cli.EXIT_OK, code, stderr.toString());
+        assertEquals(Cli.EXIT_OK, code, err());
         List<String> lines = Files.readAllLines(out, StandardCharsets.UTF_8);
         assertEquals(Arrays.asList(
                 ProxyExporter.CSV_HEADER,
@@ -141,14 +157,14 @@ class CliTest {
                 "127.0.0.1," + authProxy.getPort() + ",u,wrong,HTTP,DEAD,,,"), lines);
         assertTrue(lines.get(3).startsWith("127.0.0.1," + authProxy.getPort() + ",u,p,HTTP,ALIVE,ELITE,Canada,"));
         assertTrue(lines.get(2).endsWith(" (ms)"));
-        String err = stderr.toString();
+        String err = err();
         assertTrue(err.contains("Checking 4 http proxies with 4 threads (timeout 2000 ms, public IP 9.9.9.9)"), err);
         assertTrue(err.contains(": 4 checked, 2 working (1 elite, 1 anonymous, 0 transparent), 2 dead"), err);
         assertTrue(err.contains("Dead: 1 connection refused, 1 auth failed (HTTP 407)")
                 || err.contains("Dead: 1 auth failed (HTTP 407), 1 connection refused"), err);
         assertTrue(err.contains("Wrote 4 proxies to " + out + " (csv)"), err);
         assertTrue(!err.contains("[WORKING]") && !err.contains("[DEAD]"), "not verbose by default: " + err);
-        assertEquals("", stdout.toString());
+        assertEquals("", out());
     }
 
     @Test
@@ -157,9 +173,9 @@ class CliTest {
         int code = run(new ByteArrayInputStream(list.getBytes(StandardCharsets.UTF_8)),
                 "--cli", "-i", "-", "-t", "socks5", "--only-working", "-q", "--my-ip", "9.9.9.9",
                 "--timeout", "2000", "--api-url", apiUrl());
-        assertEquals(Cli.EXIT_OK, code, stderr.toString());
-        assertEquals(socks5Proxy.address() + "\n", stdout.toString());
-        assertEquals("", stderr.toString()); // quiet
+        assertEquals(Cli.EXIT_OK, code, err());
+        assertEquals(socks5Proxy.address() + "\n", out());
+        assertEquals("", err()); // quiet
     }
 
     @Test
@@ -167,25 +183,25 @@ class CliTest {
         Path in = input("127.0.0.1:" + closedPort);
         assertEquals(Cli.EXIT_NONE_WORKING, run("--cli", "-i", in.toString(), "--timeout", "1000",
                 "--api-url", apiUrl()));
-        assertEquals("127.0.0.1:" + closedPort + "\n", stdout.toString()); // dead proxies listed without -w
+        assertEquals("127.0.0.1:" + closedPort + "\n", out()); // dead proxies listed without -w
     }
 
     @Test
     void exitCodeTwoForUsageErrors() throws IOException {
         assertEquals(Cli.EXIT_USAGE, run("--cli", "--threads", "0", "-i", "x"));
-        assertTrue(stderr.toString().contains("error: invalid value '0' for --threads"));
+        assertTrue(err().contains("error: invalid value '0' for --threads"));
         assertEquals(Cli.EXIT_USAGE, run("--cli", "-i", input("nothing valid here").toString()));
     }
 
     @Test
     void exitCodeThreeForIoAndLookupErrors() throws IOException {
         assertEquals(Cli.EXIT_IO, run("--cli", "-i", dir.resolve("missing.txt").toString()));
-        assertTrue(stderr.toString().contains("input file not found"));
+        assertTrue(err().contains("input file not found"));
 
         String deadApi = "http://127.0.0.1:" + closedPort + "/";
         assertEquals(Cli.EXIT_IO, run("--cli", "-i", input(workingProxy.address()).toString(),
                 "--timeout", "1000", "--api-url", deadApi));
-        assertTrue(stderr.toString().contains("unable to determine your public IP"));
+        assertTrue(err().contains("unable to determine your public IP"));
     }
 
     @Test
@@ -209,7 +225,7 @@ class CliTest {
                     workingProxy.address());
             int code = run("--cli", "-i", in.toString(), "-v", "--timeout", "500", "--api-url", apiUrl());
             assertEquals(Cli.EXIT_OK, code);
-            String err = stderr.toString();
+            String err = err();
             System.out.println("---- sample verbose stderr ----\n" + err + "-------------------------------");
             assertTrue(err.contains("Input:      " + in + ": 5 valid, 1 invalid, 1 duplicate"), err);
             assertTrue(err.contains("Public IP:  9.9.9.9 (looked up via " + apiUrl() + ")"), err);
@@ -246,7 +262,7 @@ class CliTest {
             Path in = input(garbage.address(), "eve:x@" + authOnly.address(), authOnly.address());
             assertEquals(Cli.EXIT_NONE_WORKING, run("--cli", "-i", in.toString(), "-t", "socks5", "--verbose",
                     "--my-ip", "9.9.9.9", "--api-url", apiUrl()));
-            String err = stderr.toString();
+            String err = err();
             assertTrue(err.contains("Public IP:  9.9.9.9 (from --my-ip)"), err);
             assertTrue(err.contains("[DEAD] " + garbage.address() + " socks5 bad handshake\n"), err);
             assertTrue(err.contains("[DEAD] eve@" + authOnly.address() + " socks5 auth failed\n"), err);
@@ -265,7 +281,7 @@ class CliTest {
         })) {
             run("--cli", "-i", input(slow.address(), workingProxy.address()).toString(), "--timeout", "3000",
                     "--my-ip", "9.9.9.9", "--api-url", apiUrl());
-            String err = stderr.toString();
+            String err = err();
             assertTrue(err.contains("Progress: 1/2 checked (50%), 1 working, "), err);
             assertTrue(!err.contains("\r"), "no carriage returns for non-terminals: " + err);
         }
@@ -276,7 +292,7 @@ class CliTest {
         interactive = true;
         progressInterval = 50;
         run("--cli", "-i", input(workingProxy.address()).toString(), "--my-ip", "9.9.9.9", "--api-url", apiUrl());
-        String err = stderr.toString();
+        String err = err();
         assertTrue(err.contains("\rChecking: 1/1 checked (100%), 1 working, "), err);
         assertTrue(!err.contains("Progress: "), err);
     }
@@ -285,8 +301,8 @@ class CliTest {
     void versionCombinedWithOtherOptionsIsAnError() throws IOException {
         assertEquals(Cli.EXIT_USAGE, run("--cli", "-i", input(workingProxy.address()).toString(), "-t", "socks4",
                 "-V", "-o", "results.csv"));
-        assertTrue(stderr.toString().contains("did you mean -v/--verbose?"), stderr.toString());
-        assertEquals("", stdout.toString());
+        assertTrue(err().contains("did you mean -v/--verbose?"), err());
+        assertEquals("", out());
     }
 
     private static void sleep(long millis) {
@@ -300,10 +316,10 @@ class CliTest {
     @Test
     void helpAndVersion() {
         assertEquals(Cli.EXIT_OK, run("--help"));
-        assertTrue(stdout.toString().startsWith("Usage: java -jar ProxyChecker.jar --cli"));
+        assertTrue(out().startsWith("Usage: java -jar ProxyChecker.jar --cli"));
         stdout.reset();
         assertEquals(Cli.EXIT_OK, run("--cli", "--version"));
-        assertTrue(stdout.toString().startsWith("Proxy Checker "));
+        assertTrue(out().startsWith("Proxy Checker "));
     }
 
     @Test
@@ -317,15 +333,15 @@ class CliTest {
         })) {
             Path in = input(workingProxy.address(), slow.address());
             Path out = dir.resolve("partial.csv");
-            Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true),
-                    new PrintStream(stderr, true), false, 60_000);
+            Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8), false, 60_000);
             AtomicInteger code = new AtomicInteger(-1);
             Thread runner = new Thread(() -> code.set(cli.run(new String[] {"-i", in.toString(), "--api-url", apiUrl(),
                     "--timeout", "60000", "-o", out.toString(), "-v"})));
             runner.start();
             assertTrue(slowConnected.await(10, TimeUnit.SECONDS));
             long deadline = System.currentTimeMillis() + 10_000;
-            while (!stderr.toString("UTF-8").contains("[WORKING]") && System.currentTimeMillis() < deadline) {
+            while (!err().contains("[WORKING]") && System.currentTimeMillis() < deadline) {
                 Thread.sleep(20);
             }
             long start = System.nanoTime();
@@ -336,7 +352,7 @@ class CliTest {
             assertFalse(runner.isAlive());
             assertEquals(Cli.EXIT_INTERRUPTED, code.get());
             assertTrue(elapsed < 3000, "took " + elapsed + " ms");
-            String err = stderr.toString("UTF-8");
+            String err = err();
             assertTrue(err.contains("Stopped after "), err);
             assertTrue(err.contains("1 of 2 checked, 1 working"), err);
             assertTrue(err.contains("Not checked: 1 (interrupted)"), err);
@@ -350,10 +366,10 @@ class CliTest {
     @Test
     void ctrlCBeforeCheckingStartsExits130() throws IOException {
         Path in = input(workingProxy.address());
-        Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true),
-                new PrintStream(stderr, true), false, 60_000);
+        Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8), false, 60_000);
         cli.requestStop();
         assertEquals(Cli.EXIT_INTERRUPTED, cli.run(new String[] {"-i", in.toString(), "--api-url", apiUrl()}));
-        assertTrue(stderr.toString("UTF-8").contains("Interrupted before checking started"));
+        assertTrue(err().contains("Interrupted before checking started"));
     }
 }
