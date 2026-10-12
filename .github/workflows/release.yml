@@ -18,7 +18,7 @@ jobs:
           - os: windows-2022    # has WiX 3, which jpackage needs for .exe
             type: exe
             suffix: windows-x64
-          - os: macos-13        # Intel
+          - os: macos-15-intel        # Intel
             type: dmg
             suffix: macos-x64
           - os: macos-14        # Apple Silicon
