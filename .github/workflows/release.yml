@@ -55,9 +55,9 @@ jobs:
           cp target/ProxyChecker.jar staging/
           EXTRA=()
           if [[ "${{ matrix.type }}" == "exe" ]]; then
-            EXTRA+=(--win-menu --win-shortcut --win-dir-chooser --win-per-user-install)
+            EXTRA+=(--icon packaging/ProxyChecker.ico --win-menu --win-shortcut --win-dir-chooser --win-per-user-install)
           else
-            EXTRA+=(--mac-package-name ProxyChecker)
+            EXTRA+=(--icon packaging/ProxyChecker.icns --mac-package-name ProxyChecker)
           fi
           jpackage --type ${{ matrix.type }} \
             --input staging --main-jar ProxyChecker.jar \
