@@ -1,8 +1,15 @@
 package co.proxychecker.core;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
@@ -16,6 +23,7 @@ import java.util.logging.Logger;
 
 import co.proxychecker.components.RequestAPI;
 import co.proxychecker.components.entities.Proxy;
+import co.proxychecker.components.net.ProxyFailure;
 import co.proxychecker.components.entities.ProxyStatus;
 import co.proxychecker.components.entities.ProxyType;
 
@@ -107,7 +115,7 @@ public final class ProxyCheckService {
                 } catch (RuntimeException e) {
                     // never lose a result: an unexpected failure must not leave the check running forever
                     LOG.log(Level.WARNING, "Unexpected error checking " + proxy, e);
-                    markDead(proxy);
+                    markDead(proxy, e);
                 }
                 pending.add(proxy);
                 if (flushScheduled.compareAndSet(false, true)) {
@@ -127,18 +135,52 @@ public final class ProxyCheckService {
         try {
             RequestAPI.Result result = requestAPI.request(proxy);
             if (result.getResponse().anonymity == null) {
-                throw new IOException("API response did not contain an anonymity level");
+                throw new ProxyFailure(ProxyFailure.BAD_API_RESPONSE, "API response did not contain an anonymity level");
             }
             proxy.setProxyStatus(ProxyStatus.ALIVE)
                     .setProxyAnonymity(result.getResponse().anonymity)
                     .setCountry(result.getResponse().country)
-                    .setResponseTime(result.getResponseTimeMillis() + " (ms)");
+                    .setResponseTimeMillis(result.getResponseTimeMillis())
+                    .setFailureReason(null);
         } catch (IOException | IllegalArgumentException e) {
-            markDead(proxy);
+            markDead(proxy, e);
         }
     }
 
-    private static void markDead(Proxy proxy) {
-        proxy.setProxyStatus(ProxyStatus.DEAD).setProxyAnonymity(null);
+    private static void markDead(Proxy proxy, Throwable cause) {
+        proxy.setProxyStatus(ProxyStatus.DEAD).setProxyAnonymity(null).setFailureReason(describe(cause));
+    }
+
+    /**
+     * Turns a failure into a short reason for users, e.g. "timeout", "connection refused" or "auth failed".
+     */
+    public static String describe(Throwable e) {
+        if (e instanceof ProxyFailure) {
+            return ((ProxyFailure) e).getReason();
+        }
+        if (e instanceof SocketTimeoutException) {
+            return "timeout";
+        }
+        if (e instanceof UnknownHostException) {
+            return "unknown host";
+        }
+        if (e instanceof NoRouteToHostException) {
+            return "no route to host";
+        }
+        if (e instanceof ConnectException) {
+            String message = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
+            return message.contains("timed out") ? "timeout" : "connection refused";
+        }
+        if (e instanceof EOFException) {
+            return "connection closed";
+        }
+        if (e instanceof SocketException) {
+            String message = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
+            return message.contains("reset") ? "connection reset" : "network error";
+        }
+        if (e instanceof IllegalArgumentException) {
+            return "invalid proxy";
+        }
+        return "error: " + e.getClass().getSimpleName();
     }
 }

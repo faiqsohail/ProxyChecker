@@ -15,6 +15,7 @@ import com.google.gson.JsonParseException;
 
 import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.components.entities.ProxyAnonymity;
+import co.proxychecker.components.net.ProxyFailure;
 import co.proxychecker.components.net.ProxyHttpClient;
 
 /**
@@ -91,7 +92,8 @@ public class RequestAPI {
         ProxyHttpClient.Response response = new ProxyHttpClient(settings.getTimeout()).get(uri, proxy, headers);
         long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
         if (response.getStatus() != 200) {
-            throw new IOException("Unexpected HTTP status " + response.getStatus());
+            throw new ProxyFailure(response.getStatus() == 407 ? ProxyFailure.AUTH_FAILED + " (HTTP 407)"
+                    : "HTTP " + response.getStatus(), "Unexpected HTTP status " + response.getStatus());
         }
         return new Result(parseResponse(response.getBody()), elapsed);
     }
@@ -106,10 +108,10 @@ public class RequestAPI {
         try {
             response = GSON.fromJson(json, Response.class);
         } catch (JsonParseException e) {
-            throw new IOException("Invalid API response", e);
+            throw new ProxyFailure(ProxyFailure.BAD_API_RESPONSE, "Invalid API response", e);
         }
         if (response == null) {
-            throw new IOException("Empty API response");
+            throw new ProxyFailure(ProxyFailure.BAD_API_RESPONSE, "Empty API response");
         }
         return response;
     }

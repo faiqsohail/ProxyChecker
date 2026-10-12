@@ -77,6 +77,17 @@ class CliOptionsTest {
     }
 
     @Test
+    void verboseAndVersionRules() throws Exception {
+        assertTrue(parse("-i", "x", "-v").isVerbose());
+        assertTrue(parse("-i", "x", "--verbose").isVerbose());
+        assertTrue(parse("--cli", "--version").isVersion());
+        CliOptions.UsageException e = assertThrows(CliOptions.UsageException.class,
+                () -> parse("--cli", "-i", "x", "-V"));
+        assertTrue(e.getMessage().contains("did you mean -v/--verbose?"));
+        assertThrows(CliOptions.UsageException.class, () -> parse("-i", "x", "-v", "-q"));
+    }
+
+    @Test
     void rejectsInvalidCommandLines() {
         assertThrows(CliOptions.UsageException.class, () -> parse("--cli"));
         assertThrows(CliOptions.UsageException.class, () -> parse("-i"));

@@ -15,7 +15,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -46,24 +48,48 @@ public final class Cli {
     public static final int EXIT_USAGE = 2;
     public static final int EXIT_IO = 3;
 
-    private static final long PROGRESS_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
+    /** Live line refresh on a terminal. */
+    static final long INTERACTIVE_INTERVAL_MILLIS = 250;
+    /** Plain progress lines when standard error isn't a terminal (pipes, log files, Docker without -t). */
+    static final long PLAIN_INTERVAL_MILLIS = 5000;
 
     private final InputStream stdin;
     private final PrintStream stdout;
     private final PrintStream stderr;
     private final boolean interactive;
+    private final long progressIntervalMillis;
 
-    Cli(InputStream stdin, PrintStream stdout, PrintStream stderr, boolean interactive) {
+    Cli(InputStream stdin, PrintStream stdout, PrintStream stderr, boolean interactive, long progressIntervalMillis) {
         this.stdin = stdin;
         this.stdout = stdout;
         this.stderr = stderr;
         this.interactive = interactive;
+        this.progressIntervalMillis = progressIntervalMillis;
     }
 
     public static void main(String[] args) {
         // keep library warnings (e.g. about individual proxies) off the terminal
         Logger.getLogger("co.proxychecker").setLevel(Level.SEVERE);
-        System.exit(new Cli(System.in, System.out, System.err, System.console() != null).run(args));
+        boolean terminal = isTerminal();
+        System.exit(new Cli(System.in, System.out, System.err, terminal,
+                terminal ? INTERACTIVE_INTERVAL_MILLIS : PLAIN_INTERVAL_MILLIS).run(args));
+    }
+
+    /**
+     * Whether we are attached to a terminal. {@code System.console()} is null when input/output is
+     * redirected (e.g. Docker without -t); on Java 22+ it may exist anyway, so also ask
+     * {@code Console.isTerminal()} when available.
+     */
+    static boolean isTerminal() {
+        java.io.Console console = System.console();
+        if (console == null) {
+            return false;
+        }
+        try {
+            return (Boolean) java.io.Console.class.getMethod("isTerminal").invoke(console);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return true; // Java < 22: a console exists only for terminals
+        }
     }
 
     /**
@@ -90,9 +116,11 @@ public final class Cli {
 
         List<String> specs = new ArrayList<>();
         Set<String> known = new HashSet<>();
+        List<String> inputSummaries = new ArrayList<>();
         for (String input : options.getInputs()) {
             try {
-                specs.addAll(read(input, known));
+                InputStats stats = read(input, known, specs);
+                inputSummaries.add((input.equals("-") ? "standard input" : input) + ": " + stats);
             } catch (NoSuchFileException e) {
                 stderr.println("error: input file not found: " + input);
                 return EXIT_IO;
@@ -113,7 +141,9 @@ public final class Cli {
                 .setProxyType(options.getType());
         RequestAPI api = new RequestAPI(settings, options.getApiUrl());
         String ip = options.getMyIp();
+        String ipSource = "from --my-ip";
         if (ip == null) {
+            ipSource = "looked up via " + options.getApiUrl();
             try {
                 ip = api.request(null).getResponse().ip;
             } catch (IOException e) {
@@ -127,8 +157,35 @@ public final class Cli {
         }
         settings.setIp(ip.trim());
 
+        String type = options.getType().name().toLowerCase(Locale.ROOT);
+        String destination = (options.getOutput() == null ? "standard output" : options.getOutput())
+                + " (" + options.getFormat().name().toLowerCase(Locale.ROOT)
+                + (options.isOnlyWorking() ? ", working proxies only" : "") + ")";
+        if (options.isVerbose()) {
+            stderr.println(Settings.getApplicationName() + " " + Settings.getApplicationVersion());
+            for (String summary : inputSummaries) {
+                stderr.println("Input:      " + summary);
+            }
+            stderr.println("Public IP:  " + settings.getIp() + " (" + ipSource + ")");
+            stderr.println("Judge API:  " + options.getApiUrl());
+            stderr.println("Proxy type: " + type);
+            stderr.println("Threads:    " + options.getThreads());
+            stderr.println("Timeout:    " + options.getTimeout() + " ms");
+            stderr.println("Output:     " + destination);
+        }
+        if (!options.isQuiet()) {
+            stderr.printf(Locale.ROOT, "Checking %d %s proxies with %d threads (timeout %d ms, public IP %s)%n",
+                    specs.size(), type, Math.min(options.getThreads(), specs.size()), options.getTimeout(),
+                    settings.getIp());
+        }
+
         List<Proxy> proxies = ProxyCheckService.parse(specs, options.getType());
-        List<Proxy> results = runCheck(proxies, settings, api, options.isQuiet());
+        ProgressReporter progress = options.isQuiet() ? null
+                : new ProgressReporter(stderr, interactive, options.isVerbose(), proxies.size(), progressIntervalMillis);
+        List<Proxy> results = runCheck(proxies, settings, api, progress);
+        if (progress != null) {
+            progress.finish();
+        }
 
         // report in input order, regardless of the order checks finished in
         Map<Proxy, Integer> order = new IdentityHashMap<>();
@@ -140,6 +197,7 @@ public final class Cli {
         List<Proxy> output = new ArrayList<>();
         int working = 0;
         int[] byAnonymity = new int[ProxyAnonymity.values().length];
+        Map<String, Integer> deadReasons = new LinkedHashMap<>();
         for (Proxy proxy : results) {
             boolean alive = proxy.getProxyStatus() == ProxyStatus.ALIVE;
             if (alive) {
@@ -147,6 +205,9 @@ public final class Cli {
                 if (proxy.getProxyAnonymity() != null) {
                     byAnonymity[proxy.getProxyAnonymity().ordinal()]++;
                 }
+            } else {
+                String reason = proxy.getFailureReason() == null ? "failed" : proxy.getFailureReason();
+                deadReasons.merge(reason, 1, Integer::sum);
             }
             if (alive || !options.isOnlyWorking()) {
                 output.add(proxy);
@@ -160,31 +221,73 @@ public final class Cli {
             return EXIT_IO;
         }
 
-        if (!options.isQuiet()) {
-            stderr.printf("Checked %d proxies: %d working (%d elite, %d anonymous, %d transparent), %d dead.%n",
-                    results.size(), working,
+        if (progress != null) {
+            stderr.printf(Locale.ROOT, "Done in %.1fs: %d checked, %d working (%d elite, %d anonymous, %d transparent),"
+                            + " %d dead%n",
+                    progress.elapsedSeconds(), results.size(), working,
                     byAnonymity[ProxyAnonymity.ELITE.ordinal()],
                     byAnonymity[ProxyAnonymity.ANONYMOUS.ordinal()],
                     byAnonymity[ProxyAnonymity.TRANSPARENT.ordinal()],
                     results.size() - working);
-            if (options.getOutput() != null) {
-                stderr.println("Results written to " + options.getOutput());
+            if (!deadReasons.isEmpty()) {
+                List<Map.Entry<String, Integer>> reasons = new ArrayList<>(deadReasons.entrySet());
+                reasons.sort((a, b) -> b.getValue() - a.getValue());
+                StringBuilder line = new StringBuilder("Dead: ");
+                for (int i = 0; i < reasons.size(); i++) {
+                    line.append(i == 0 ? "" : ", ").append(reasons.get(i).getValue()).append(' ')
+                            .append(reasons.get(i).getKey());
+                }
+                stderr.println(line);
             }
+            stderr.println("Wrote " + output.size() + " " + (output.size() == 1 ? "proxy" : "proxies")
+                    + " to " + destination);
         }
         return working > 0 ? EXIT_OK : EXIT_NONE_WORKING;
     }
 
-    private List<String> read(String input, Set<String> known) throws IOException {
-        if (input.equals("-")) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(stdin, StandardCharsets.UTF_8));
-            return ProxyListReader.readNewProxies(reader, known);
-        }
-        try (BufferedReader reader = Files.newBufferedReader(Paths.get(input), StandardCharsets.UTF_8)) {
-            return ProxyListReader.readNewProxies(reader, known);
+    /** Counts of what was read from one input. */
+    private static final class InputStats {
+        int valid;
+        int invalid;
+        int duplicates;
+
+        @Override
+        public String toString() {
+            return valid + " valid, " + invalid + " invalid, " + duplicates + " duplicate";
         }
     }
 
-    private List<Proxy> runCheck(List<Proxy> proxies, UserSettings settings, RequestAPI api, boolean quiet) {
+    private InputStats read(String input, Set<String> known, List<String> specs) throws IOException {
+        if (input.equals("-")) {
+            return read(new BufferedReader(new InputStreamReader(stdin, StandardCharsets.UTF_8)), known, specs);
+        }
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(input), StandardCharsets.UTF_8)) {
+            return read(reader, known, specs);
+        }
+    }
+
+    private static InputStats read(BufferedReader reader, Set<String> known, List<String> specs) throws IOException {
+        InputStats stats = new InputStats();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            String value = ProxyListReader.normalize(line);
+            if (value.isEmpty() || value.startsWith("#")) {
+                continue;
+            }
+            if (!Proxy.isValidFormat(value)) {
+                stats.invalid++;
+            } else if (known.add(value)) {
+                stats.valid++;
+                specs.add(value);
+            } else {
+                stats.duplicates++;
+            }
+        }
+        return stats;
+    }
+
+    private static List<Proxy> runCheck(List<Proxy> proxies, UserSettings settings, RequestAPI api,
+                                        ProgressReporter progress) {
         List<Proxy> results = new ArrayList<>(proxies.size());
         CountDownLatch done = new CountDownLatch(1);
         ExecutorService callbacks = Executors.newSingleThreadExecutor(runnable -> {
@@ -192,55 +295,22 @@ public final class Cli {
             thread.setDaemon(true);
             return thread;
         });
-        int total = proxies.size();
-        long started = System.nanoTime();
-        long[] lastProgress = {0};
-        int[] working = {0};
-        int[] lastDecile = {0};
-
         ProxyCheckService.check(proxies, settings.getThreads(), ProxyCheckService.apiTester(api), callbacks,
                 batch -> {
                     results.addAll(batch);
-                    for (Proxy proxy : batch) {
-                        if (proxy.getProxyStatus() == ProxyStatus.ALIVE) {
-                            working[0]++;
-                        }
-                    }
-                    if (quiet) {
-                        return;
-                    }
-                    int checked = results.size();
-                    if (interactive) {
-                        long now = System.nanoTime();
-                        if (now - lastProgress[0] >= PROGRESS_INTERVAL_NANOS || checked == total) {
-                            lastProgress[0] = now;
-                            stderr.printf("\rChecked %d/%d (%d%%), %d working", checked, total,
-                                    checked * 100 / total, working[0]);
-                            stderr.flush();
-                        }
-                    } else {
-                        int decile = checked * 10 / total;
-                        if (decile > lastDecile[0]) {
-                            lastDecile[0] = decile;
-                            stderr.printf("Checked %d/%d (%d%%), %d working%n", checked, total,
-                                    checked * 100 / total, working[0]);
+                    if (progress != null) {
+                        for (Proxy proxy : batch) {
+                            progress.onChecked(proxy);
                         }
                     }
                 },
                 done::countDown);
-
         try {
             done.await();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
         callbacks.shutdown();
-        if (!quiet) {
-            if (interactive) {
-                stderr.println();
-            }
-            stderr.printf("Finished in %.1f s%n", (System.nanoTime() - started) / 1e9);
-        }
         // results is only modified on the callbacks thread; awaiting termination publishes it safely
         try {
             callbacks.awaitTermination(5, TimeUnit.SECONDS);

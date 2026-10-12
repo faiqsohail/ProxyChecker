@@ -89,8 +89,12 @@ class CliTest {
         socks5Proxy.close();
     }
 
+    private boolean interactive = false;
+    private long progressInterval = 60_000;
+
     private int run(InputStream stdin, String... args) {
-        Cli cli = new Cli(stdin, new PrintStream(stdout, true), new PrintStream(stderr, true), false);
+        Cli cli = new Cli(stdin, new PrintStream(stdout, true), new PrintStream(stderr, true), interactive,
+                progressInterval);
         return cli.run(args);
     }
 
@@ -134,7 +138,12 @@ class CliTest {
         assertTrue(lines.get(3).startsWith("127.0.0.1," + authProxy.getPort() + ",u,p,HTTP,ALIVE,ELITE,Canada,"));
         assertTrue(lines.get(2).endsWith(" (ms)"));
         String err = stderr.toString();
-        assertTrue(err.contains("Checked 4 proxies: 2 working (1 elite, 1 anonymous, 0 transparent), 2 dead."), err);
+        assertTrue(err.contains("Checking 4 http proxies with 4 threads (timeout 2000 ms, public IP 9.9.9.9)"), err);
+        assertTrue(err.contains(": 4 checked, 2 working (1 elite, 1 anonymous, 0 transparent), 2 dead"), err);
+        assertTrue(err.contains("Dead: 1 connection refused, 1 auth failed (HTTP 407)")
+                || err.contains("Dead: 1 auth failed (HTTP 407), 1 connection refused"), err);
+        assertTrue(err.contains("Wrote 4 proxies to " + out + " (csv)"), err);
+        assertTrue(!err.contains("[WORKING]") && !err.contains("[DEAD]"), "not verbose by default: " + err);
         assertEquals("", stdout.toString());
     }
 
@@ -173,6 +182,115 @@ class CliTest {
         assertEquals(Cli.EXIT_IO, run("--cli", "-i", input(workingProxy.address()).toString(),
                 "--timeout", "1000", "--api-url", deadApi));
         assertTrue(stderr.toString().contains("unable to determine your public IP"));
+    }
+
+    @Test
+    void verbosePrintsEachResultWithReasonAndSettings() throws IOException {
+        try (FakeServer slow = new FakeServer((in, out) -> {
+                FakeServer.readHttpRequest(in);
+                sleep(3000);
+            });
+             FakeServer notJudge = new FakeServer((in, out) -> {
+                FakeServer.readHttpRequest(in);
+                FakeServer.writeHttp(out, "200 OK", "<html>captive portal</html>");
+            })) {
+            Path in = input(
+                    "# comment lines are ignored",
+                    workingProxy.address(),
+                    "127.0.0.1:" + closedPort,
+                    "u:wrong@" + authProxy.address(),
+                    slow.address(),
+                    notJudge.address(),
+                    "bad entry",
+                    workingProxy.address());
+            int code = run("--cli", "-i", in.toString(), "-v", "--timeout", "500", "--api-url", apiUrl());
+            assertEquals(Cli.EXIT_OK, code);
+            String err = stderr.toString();
+            System.out.println("---- sample verbose stderr ----\n" + err + "-------------------------------");
+            assertTrue(err.contains("Input:      " + in + ": 5 valid, 1 invalid, 1 duplicate"), err);
+            assertTrue(err.contains("Public IP:  9.9.9.9 (looked up via " + apiUrl() + ")"), err);
+            assertTrue(err.contains("Proxy type: http"), err);
+            assertTrue(err.contains("Threads:    100"), err);
+            assertTrue(err.contains("Timeout:    500 ms"), err);
+            assertTrue(err.contains("Output:     standard output (txt)"), err);
+            assertTrue(err.matches("(?s).*\\[WORKING\\] " + workingProxy.address()
+                    + " http anonymous Korea, Republic of \\d+ms\n.*"), err);
+            assertTrue(err.contains("[DEAD] 127.0.0.1:" + closedPort + " http connection refused\n"), err);
+            assertTrue(err.contains("[DEAD] u@" + authProxy.address() + " http auth failed (HTTP 407)\n"), err);
+            assertTrue(!err.contains("wrong"), "password must not be printed");
+            assertTrue(err.contains("[DEAD] " + slow.address() + " http timeout\n"), err);
+            assertTrue(err.contains("[DEAD] " + notJudge.address() + " http bad API response\n"), err);
+        }
+    }
+
+    @Test
+    void verboseShowsSocksHandshakeAndAuthFailures() throws IOException {
+        try (FakeServer garbage = new FakeServer((in, out) -> {
+                FakeServer.read(in, 3);
+                out.write("HTTP/1.1 400 Bad Request\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1));
+            });
+             FakeServer authOnly = new FakeServer((in, out) -> {
+                byte[] greeting = FakeServer.read(in, 2);
+                FakeServer.read(in, greeting[1]);
+                out.write(new byte[] {5, 2});
+                out.flush();
+                FakeServer.read(in, 1);
+                FakeServer.read(in, FakeServer.read(in, 1)[0] & 0xFF);
+                FakeServer.read(in, FakeServer.read(in, 1)[0] & 0xFF);
+                out.write(new byte[] {1, 1});
+            })) {
+            Path in = input(garbage.address(), "eve:x@" + authOnly.address(), authOnly.address());
+            assertEquals(Cli.EXIT_NONE_WORKING, run("--cli", "-i", in.toString(), "-t", "socks5", "--verbose",
+                    "--my-ip", "9.9.9.9", "--api-url", apiUrl()));
+            String err = stderr.toString();
+            assertTrue(err.contains("Public IP:  9.9.9.9 (from --my-ip)"), err);
+            assertTrue(err.contains("[DEAD] " + garbage.address() + " socks5 bad handshake\n"), err);
+            assertTrue(err.contains("[DEAD] eve@" + authOnly.address() + " socks5 auth failed\n"), err);
+            assertTrue(err.contains("[DEAD] " + authOnly.address() + " socks5 auth required\n"), err);
+            assertTrue(err.contains("Dead: "), err);
+        }
+    }
+
+    @Test
+    void plainProgressLinesWhenNotATerminal() throws IOException {
+        progressInterval = 200;
+        try (FakeServer slow = new FakeServer((in, out) -> {
+            FakeServer.readHttpRequest(in);
+            sleep(1500);
+            FakeServer.writeHttp(out, "200 OK", FakeServer.JUDGE_RESPONSE);
+        })) {
+            run("--cli", "-i", input(slow.address(), workingProxy.address()).toString(), "--timeout", "3000",
+                    "--my-ip", "9.9.9.9", "--api-url", apiUrl());
+            String err = stderr.toString();
+            assertTrue(err.contains("Progress: 1/2 checked (50%), 1 working, "), err);
+            assertTrue(!err.contains("\r"), "no carriage returns for non-terminals: " + err);
+        }
+    }
+
+    @Test
+    void liveProgressLineOnATerminal() throws IOException {
+        interactive = true;
+        progressInterval = 50;
+        run("--cli", "-i", input(workingProxy.address()).toString(), "--my-ip", "9.9.9.9", "--api-url", apiUrl());
+        String err = stderr.toString();
+        assertTrue(err.contains("\rChecking: 1/1 checked (100%), 1 working, "), err);
+        assertTrue(!err.contains("Progress: "), err);
+    }
+
+    @Test
+    void versionCombinedWithOtherOptionsIsAnError() throws IOException {
+        assertEquals(Cli.EXIT_USAGE, run("--cli", "-i", input(workingProxy.address()).toString(), "-t", "socks4",
+                "-V", "-o", "results.csv"));
+        assertTrue(stderr.toString().contains("did you mean -v/--verbose?"), stderr.toString());
+        assertEquals("", stdout.toString());
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test

@@ -149,26 +149,26 @@ public final class ProxyHttpClient {
         do {
             statusLine = readLine(in);
             if (statusLine == null || !statusLine.startsWith("HTTP/")) {
-                throw new IOException("Invalid HTTP response");
+                throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Invalid HTTP response");
             }
             String[] parts = statusLine.split(" ", 3);
             try {
                 status = Integer.parseInt(parts.length > 1 ? parts[1] : "");
             } catch (NumberFormatException e) {
-                throw new IOException("Invalid HTTP status line");
+                throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Invalid HTTP status line");
             }
             long contentLength = -1;
             boolean chunked = false;
             for (int i = 0; ; i++) {
                 String line = readLine(in);
                 if (line == null) {
-                    throw new IOException("Unexpected end of HTTP headers");
+                    throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Unexpected end of HTTP headers");
                 }
                 if (line.isEmpty()) {
                     break;
                 }
                 if (i >= MAX_HEADERS) {
-                    throw new IOException("Too many HTTP headers");
+                    throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Too many HTTP headers");
                 }
                 int colon = line.indexOf(':');
                 if (colon <= 0) {
@@ -180,7 +180,7 @@ public final class ProxyHttpClient {
                     try {
                         contentLength = Long.parseLong(value);
                     } catch (NumberFormatException e) {
-                        throw new IOException("Invalid Content-Length");
+                        throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Invalid Content-Length");
                     }
                 } else if (name.equals("transfer-encoding") && value.toLowerCase(Locale.ROOT).contains("chunked")) {
                     chunked = true;
@@ -194,7 +194,7 @@ public final class ProxyHttpClient {
                 body = readChunked(in);
             } else if (contentLength >= 0) {
                 if (contentLength > MAX_BODY_BYTES) {
-                    throw new IOException("HTTP response too large");
+                    throw new ProxyFailure("response too large", "HTTP response too large");
                 }
                 body = Socks.readFully(in, (int) contentLength);
             } else {
@@ -209,7 +209,7 @@ public final class ProxyHttpClient {
         while (true) {
             String sizeLine = readLine(in);
             if (sizeLine == null) {
-                throw new IOException("Unexpected end of chunked body");
+                throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Unexpected end of chunked body");
             }
             int semicolon = sizeLine.indexOf(';');
             String hex = (semicolon >= 0 ? sizeLine.substring(0, semicolon) : sizeLine).trim();
@@ -217,7 +217,7 @@ public final class ProxyHttpClient {
             try {
                 size = Integer.parseInt(hex, 16);
             } catch (NumberFormatException e) {
-                throw new IOException("Invalid chunk size");
+                throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "Invalid chunk size");
             }
             if (size == 0) {
                 String trailer;
@@ -227,7 +227,7 @@ public final class ProxyHttpClient {
                 return out.toByteArray();
             }
             if (size < 0 || out.size() + size > MAX_BODY_BYTES) {
-                throw new IOException("HTTP response too large");
+                throw new ProxyFailure("response too large", "HTTP response too large");
             }
             out.write(Socks.readFully(in, size));
             readLine(in); // CRLF after the chunk
@@ -240,7 +240,7 @@ public final class ProxyHttpClient {
         int read;
         while ((read = in.read(buffer)) != -1) {
             if (out.size() + read > MAX_BODY_BYTES) {
-                throw new IOException("HTTP response too large");
+                throw new ProxyFailure("response too large", "HTTP response too large");
             }
             out.write(buffer, 0, read);
         }
@@ -260,7 +260,7 @@ public final class ProxyHttpClient {
                 return new String(bytes, 0, length, StandardCharsets.ISO_8859_1);
             }
             if (line.size() >= MAX_LINE_BYTES) {
-                throw new IOException("HTTP line too long");
+                throw new ProxyFailure(ProxyFailure.BAD_HTTP_RESPONSE, "HTTP line too long");
             }
             line.write(b);
         }

@@ -59,9 +59,25 @@ java -jar ProxyChecker.jar --help
 | `-w, --only-working` | only output working proxies |
 | `--my-ip <ip>` | your public IP (skips the lookup) |
 | `--api-url <url>` | use another compatible proxy judge API |
+| `-v, --verbose` | print the settings used and every proxy's result as it finishes, with the failure reason |
 | `-q, --quiet` | no progress or summary on standard error |
+| `-V, --version` | print the version; must be used on its own (combined with other options it's an error, as it's easily confused with `-v`) |
 
-Progress and a summary are printed to standard error. Exit codes: `0` working proxies found, `1` none working,
+Progress and a summary are printed to standard error: a live progress line on a terminal, or a plain
+`Progress: ...` line every 5 seconds when standard error isn't a terminal (pipes, log files, `docker run` without `-t`).
+With `-v` each proxy is reported as soon as it finishes:
+```
+[WORKING] 1.0.133.89:4153 socks4 anonymous United States 812ms
+[DEAD] 203.0.113.7:1080 socks4 connection refused
+[DEAD] alice@203.0.113.9:1080 socks5 auth failed
+```
+Failure reasons include `timeout`, `connection refused`, `auth failed`, `auth required`, `bad handshake`,
+`rejected by proxy`, `bad HTTP response` and `bad API response`. Passwords are never printed.
+
+With Docker, arguments are passed straight to the application:
+```
+docker run --rm -v "$PWD:/data" faiqsohail/proxychecker --cli -i /data/proxies.txt -t socks4 -v -o /data/results.csv
+``` Exit codes: `0` working proxies found, `1` none working,
 `2` invalid arguments or no valid proxies in the input, `3` file or public IP lookup error.
 Running the jar without arguments opens the GUI as before.
 

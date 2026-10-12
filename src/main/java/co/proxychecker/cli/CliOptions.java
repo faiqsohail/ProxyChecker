@@ -48,9 +48,14 @@ public final class CliOptions {
             "  -w, --only-working     only output working proxies",
             "      --my-ip <ip>       your public IP address (skips looking it up)",
             "      --api-url <url>    proxy judge API to use (default: " + RequestAPI.DEFAULT_API_URL + ")",
+            "  -v, --verbose          print every proxy's result (with the failure reason) as it",
+            "                         finishes, plus the settings used",
             "  -q, --quiet            no progress or summary on standard error",
             "  -h, --help             show this help and exit",
-            "  -V, --version          show the version and exit",
+            "  -V, --version          show the version and exit; must be used on its own",
+            "",
+            "Output: results go to standard output or the -o file. Progress (a live line on a terminal,",
+            "periodic plain lines otherwise, e.g. in Docker without -t) and a summary go to standard error.",
             "",
             "Exit codes:",
             "  0  at least one working proxy was found",
@@ -71,6 +76,7 @@ public final class CliOptions {
     private int timeout = UserSettings.DEFAULT_TIMEOUT;
     private boolean onlyWorking;
     private boolean quiet;
+    private boolean verbose;
     private String myIp;
     private String apiUrl = RequestAPI.DEFAULT_API_URL;
     private boolean help;
@@ -120,6 +126,10 @@ public final class CliOptions {
                 case "--quiet":
                     options.quiet = true;
                     break;
+                case "-v":
+                case "--verbose":
+                    options.verbose = true;
+                    break;
                 case "-i":
                 case "--input":
                     options.inputs.add(value != null ? value : next(args, ++i, arg));
@@ -165,10 +175,27 @@ public final class CliOptions {
                     options.inputs.add(arg);
             }
         }
+        if (options.version && countNonCliArgs(args) > 1) {
+            throw new UsageException("-V/--version shows the version and can't be combined with other options"
+                    + " (did you mean -v/--verbose?)");
+        }
+        if (options.verbose && options.quiet) {
+            throw new UsageException("-v/--verbose and -q/--quiet can't be used together");
+        }
         if (!options.help && !options.version && options.inputs.isEmpty()) {
             throw new UsageException("no input given (use -i <file>, or -i - for standard input)");
         }
         return options;
+    }
+
+    private static int countNonCliArgs(String[] args) {
+        int count = 0;
+        for (String arg : args) {
+            if (!arg.equals("--cli")) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static String next(String[] args, int index, String option) throws UsageException {
@@ -238,6 +265,10 @@ public final class CliOptions {
 
     public boolean isQuiet() {
         return quiet;
+    }
+
+    public boolean isVerbose() {
+        return verbose;
     }
 
     /** @return the public IP given on the command line, or null to look it up */

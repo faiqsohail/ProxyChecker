@@ -77,11 +77,12 @@ final class Socks {
 
         byte[] reply = readFully(in, 8);
         if (reply[0] != 0x00 && reply[0] != SOCKS4_VERSION) {
-            throw new IOException("Invalid SOCKS4 reply");
+            throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Invalid SOCKS4 reply");
         }
         int status = reply[1] & 0xFF;
         if (status != SOCKS4_GRANTED) {
-            throw new IOException("SOCKS4 request rejected (code 0x" + Integer.toHexString(status) + ")");
+            throw new ProxyFailure(status == 0x5D ? ProxyFailure.AUTH_FAILED : ProxyFailure.REJECTED,
+                    "SOCKS4 request rejected (code 0x" + Integer.toHexString(status) + ")");
         }
     }
 
@@ -101,18 +102,19 @@ final class Socks {
 
         byte[] choice = readFully(in, 2);
         if (choice[0] != SOCKS5_VERSION) {
-            throw new IOException("Invalid SOCKS5 reply");
+            throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Invalid SOCKS5 reply");
         }
         int method = choice[1] & 0xFF;
         if (method == SOCKS5_USER_PASS) {
             if (!withCredentials) {
-                throw new IOException("SOCKS5 proxy requires authentication");
+                throw new ProxyFailure(ProxyFailure.AUTH_REQUIRED, "SOCKS5 proxy requires authentication");
             }
             authenticate5(in, out, username, password == null ? "" : password);
         } else if (method == SOCKS5_NO_ACCEPTABLE) {
-            throw new IOException("SOCKS5 proxy accepted none of the offered authentication methods");
+            throw new ProxyFailure(ProxyFailure.AUTH_REQUIRED,
+                    "SOCKS5 proxy accepted none of the offered authentication methods");
         } else if (method != SOCKS5_NO_AUTH) {
-            throw new IOException("Unsupported SOCKS5 authentication method " + method);
+            throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Unsupported SOCKS5 authentication method " + method);
         }
 
         out.write(SOCKS5_VERSION);
@@ -124,7 +126,7 @@ final class Socks {
         } else {
             byte[] name = host.getBytes(StandardCharsets.US_ASCII);
             if (name.length > 255) {
-                throw new IOException("Host name too long for SOCKS5");
+                throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Host name too long for SOCKS5");
             }
             out.write(SOCKS5_ATYP_DOMAIN);
             out.write(name.length);
@@ -135,10 +137,10 @@ final class Socks {
 
         byte[] reply = readFully(in, 4);
         if (reply[0] != SOCKS5_VERSION) {
-            throw new IOException("Invalid SOCKS5 reply");
+            throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Invalid SOCKS5 reply");
         }
         if (reply[1] != 0x00) {
-            throw new IOException("SOCKS5 connect failed (code " + (reply[1] & 0xFF) + ")");
+            throw new ProxyFailure(ProxyFailure.REJECTED, "SOCKS5 connect failed (code " + (reply[1] & 0xFF) + ")");
         }
         int addressLength;
         switch (reply[3] & 0xFF) {
@@ -152,7 +154,7 @@ final class Socks {
                 addressLength = readFully(in, 1)[0] & 0xFF;
                 break;
             default:
-                throw new IOException("Invalid SOCKS5 address type");
+                throw new ProxyFailure(ProxyFailure.BAD_HANDSHAKE, "Invalid SOCKS5 address type");
         }
         readFully(in, addressLength + 2); // bound address and port, unused
     }
@@ -162,7 +164,7 @@ final class Socks {
         byte[] user = username.getBytes(StandardCharsets.UTF_8);
         byte[] pass = password.getBytes(StandardCharsets.UTF_8);
         if (user.length == 0 || user.length > 255 || pass.length > 255) {
-            throw new IOException("SOCKS5 username and password must be 1-255 bytes");
+            throw new ProxyFailure(ProxyFailure.AUTH_FAILED, "SOCKS5 username and password must be 1-255 bytes");
         }
         out.write(0x01); // sub-negotiation version
         out.write(user.length);
@@ -172,7 +174,7 @@ final class Socks {
         out.flush();
         byte[] status = readFully(in, 2);
         if (status[1] != 0x00) {
-            throw new IOException("SOCKS5 authentication failed");
+            throw new ProxyFailure(ProxyFailure.AUTH_FAILED, "SOCKS5 authentication failed");
         }
     }
 

@@ -15,4 +15,6 @@ RUN apt-get update \
 
 COPY --from=builder /app/target/ProxyChecker.jar ./ProxyChecker.jar
 
-CMD ["java", "-jar", "ProxyChecker.jar"]
+# arguments are passed to the application: no arguments opens the GUI, `--cli ...` runs headless, e.g.
+#   docker run --rm -v "$PWD:/data" faiqsohail/proxychecker --cli -i /data/proxies.txt -o /data/results.csv -v
+ENTRYPOINT ["java", "-jar", "ProxyChecker.jar"]

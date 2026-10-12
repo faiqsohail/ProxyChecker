@@ -21,6 +21,8 @@ public class Proxy {
     private ProxyAnonymity anonymity = ProxyAnonymity.TRANSPARENT;
     private String country;
     private String responseTime;
+    private long responseTimeMillis = -1;
+    private String failureReason;
 
     /**
      * Parsed parts of a proxy string.
@@ -161,6 +163,34 @@ public class Proxy {
 
     public Proxy setResponseTime(String responseTime) {
         this.responseTime = responseTime;
+        return this;
+    }
+
+    /**
+     * @return response time in milliseconds, or -1 if the proxy is dead
+     */
+    public long getResponseTimeMillis() {
+        return responseTimeMillis;
+    }
+
+    /**
+     * Sets the response time (also the display value returned by {@link #getResponseTime()}).
+     */
+    public Proxy setResponseTimeMillis(long millis) {
+        this.responseTimeMillis = millis;
+        this.responseTime = millis < 0 ? null : millis + " (ms)";
+        return this;
+    }
+
+    /**
+     * @return why the proxy is dead (e.g. "timeout", "connection refused"), or null if it works
+     */
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public Proxy setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
         return this;
     }
 
