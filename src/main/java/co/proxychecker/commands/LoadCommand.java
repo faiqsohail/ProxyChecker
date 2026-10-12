@@ -15,6 +15,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
 
 import co.proxychecker.components.entities.Proxy;
+import co.proxychecker.core.ProxyListReader;
 import co.proxychecker.gui.AlertBox;
 
 /**
@@ -42,7 +43,7 @@ public final class LoadCommand {
         List<String> added = new ArrayList<>();
         for (File file : selected) {
             try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-                added.addAll(readNewProxies(reader, known));
+                added.addAll(ProxyListReader.readNewProxies(reader, known));
             } catch (NoSuchFileException e) {
                 AlertBox.show(Alert.AlertType.INFORMATION, "File Not Found",
                         "The file you selected: " + file.getName() + ", doesn't seem to exist!");
@@ -59,7 +60,7 @@ public final class LoadCommand {
      * Adds a single proxy entered by the user, telling them if it is invalid or already loaded.
      */
     public static void string(String input, ListView<String> view) {
-        String value = normalize(input);
+        String value = ProxyListReader.normalize(input);
         if (!Proxy.isValidFormat(value)) {
             AlertBox.show(Alert.AlertType.ERROR, "Invalid Proxy Format",
                     "You must enter a valid proxy in the format host:port, user:pass@host:port or host:port:user:pass");
@@ -69,31 +70,5 @@ public final class LoadCommand {
         } else {
             view.getItems().add(value);
         }
-    }
-
-    /**
-     * Reads valid proxies that aren't in {@code known} yet, adding them to {@code known}.
-     */
-    static List<String> readNewProxies(BufferedReader reader, Set<String> known) throws IOException {
-        List<String> added = new ArrayList<>();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String value = normalize(line);
-            if (Proxy.isValidFormat(value) && known.add(value)) {
-                added.add(value);
-            }
-        }
-        return added;
-    }
-
-    /**
-     * Trims whitespace and a UTF-8 byte order mark, so "1.2.3.4:80 " and "1.2.3.4:80" are the same proxy.
-     */
-    static String normalize(String line) {
-        String value = line.trim();
-        if (!value.isEmpty() && value.charAt(0) == '\uFEFF') {
-            value = value.substring(1).trim();
-        }
-        return value;
     }
 }

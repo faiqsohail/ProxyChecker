@@ -1,4 +1,4 @@
-package co.proxychecker.commands;
+package co.proxychecker.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,20 +13,20 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-class LoadCommandTest {
+class ProxyListReaderTest {
 
     @Test
     void normalizesWhitespaceAndByteOrderMark() {
-        assertEquals("1.2.3.4:80", LoadCommand.normalize("  1.2.3.4:80\t"));
-        assertEquals("1.2.3.4:80", LoadCommand.normalize("\uFEFF1.2.3.4:80"));
-        assertEquals("", LoadCommand.normalize("   "));
+        assertEquals("1.2.3.4:80", ProxyListReader.normalize("  1.2.3.4:80\t"));
+        assertEquals("1.2.3.4:80", ProxyListReader.normalize("\uFEFF1.2.3.4:80"));
+        assertEquals("", ProxyListReader.normalize("   "));
     }
 
     @Test
     void readsOnlyNewValidProxies() throws IOException {
         Set<String> known = new HashSet<>(Arrays.asList("1.1.1.1:80"));
         String file = "\uFEFF1.1.1.1:80\n2.2.2.2:8080\r\n garbage \n2.2.2.2:8080\n\n3.3.3.3:99999\n4.4.4.4:3128 \n";
-        List<String> added = LoadCommand.readNewProxies(new BufferedReader(new StringReader(file)), known);
+        List<String> added = ProxyListReader.readNewProxies(new BufferedReader(new StringReader(file)), known);
         assertEquals(Arrays.asList("2.2.2.2:8080", "4.4.4.4:3128"), added);
     }
 
@@ -39,7 +39,7 @@ class LoadCommandTest {
                     .append(":").append(1 + i % 60000).append('\n');
         }
         long start = System.nanoTime();
-        List<String> added = LoadCommand.readNewProxies(
+        List<String> added = ProxyListReader.readNewProxies(
                 new BufferedReader(new StringReader(file.toString())), new HashSet<>());
         long millis = (System.nanoTime() - start) / 1_000_000;
         assertEquals(500_000, added.size());

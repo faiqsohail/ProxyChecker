@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
-import co.proxychecker.commands.ProxyCheckCommandAccess;
+import co.proxychecker.core.ProxyCheckService;
 import co.proxychecker.components.RequestAPI;
 import co.proxychecker.components.UserSettings;
 import co.proxychecker.components.entities.Proxy;
@@ -36,7 +36,7 @@ class ProxyAuthTest {
 
     private static Proxy check(String spec, ProxyType type) {
         Proxy proxy = new Proxy(spec, type);
-        ProxyCheckCommandAccess.testProxy(proxy, new RequestAPI(new UserSettings().setTimeout(3000), API));
+        ProxyCheckService.testProxy(proxy, new RequestAPI(new UserSettings().setTimeout(3000), API));
         return proxy;
     }
 
@@ -152,7 +152,7 @@ class ProxyAuthTest {
             FakeServer.writeHttp(out, "200 OK", FakeServer.JUDGE_RESPONSE);
         })) {
             Proxy proxy = new Proxy("carol:ignored@" + server.address(), ProxyType.SOCKS4);
-            ProxyCheckCommandAccess.testProxy(proxy,
+            ProxyCheckService.testProxy(proxy,
                     new RequestAPI(new UserSettings().setTimeout(3000), "http://127.0.0.1:80/"));
             assertEquals(ProxyStatus.ALIVE, proxy.getProxyStatus());
             assertEquals("carol", userId.get());

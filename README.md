@@ -17,6 +17,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 * Ability to Load from multiple Proxy Lists
 * Proxy Anonymity, Response Time & Country Information
 * Export Table (CSV) and Export Based on Anonymity
+* Command line mode for servers and scripts (no GUI required)
 
 ### Requirements
 * Java 11+ (the packaged releases bundle JavaFX)
@@ -39,6 +40,30 @@ Simply download the latest packaged release for your system and run!
 
 Now also available on [Docker Hub](https://hub.docker.com/r/faiqsohail/proxychecker) 🐳
 
+
+### Command Line
+Run the same checker without the GUI (JavaFX is not initialised, so it works on headless servers):
+```
+java -jar ProxyChecker.jar --cli -i proxies.txt -t socks5 --threads 200 --timeout 5000 -o results.csv --only-working
+cat proxies.txt | java -jar ProxyChecker.jar --cli -i - -q --only-working > working.txt
+java -jar ProxyChecker.jar --help
+```
+| Option | Description |
+|---|---|
+| `-i, --input <file>` | proxy list, repeatable; `-` reads standard input |
+| `-o, --output <file>` | write results to a file instead of standard output |
+| `-f, --format txt\|csv` | `txt`: one proxy per line as loaded; `csv`: all details. Defaults to `csv` for `*.csv` outputs |
+| `-t, --type http\|socks4\|socks5` | proxy protocol (default `http`) |
+| `--threads <n>` | concurrent checks, 1-1000 (default 100) |
+| `--timeout <ms>` | connect/read timeout, at least 500 (default 5000) |
+| `-w, --only-working` | only output working proxies |
+| `--my-ip <ip>` | your public IP (skips the lookup) |
+| `--api-url <url>` | use another compatible proxy judge API |
+| `-q, --quiet` | no progress or summary on standard error |
+
+Progress and a summary are printed to standard error. Exit codes: `0` working proxies found, `1` none working,
+`2` invalid arguments or no valid proxies in the input, `3` file or public IP lookup error.
+Running the jar without arguments opens the GUI as before.
 
 ### Build from Source
 This assumes you have Java 11+ (JDK) and [Maven](https://maven.apache.org/download.cgi) set up correctly.

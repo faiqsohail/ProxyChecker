@@ -5,12 +5,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.List;
 
 import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TableView;
 
+import co.proxychecker.core.ProxyExporter;
 import co.proxychecker.gui.AlertBox;
 import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.components.entities.ProxyStatus;
@@ -20,8 +20,6 @@ import co.proxychecker.components.entities.ProxyAnonymity;
  * Exports proxies to disk.
  */
 public final class ExportCommand {
-
-    static final String CSV_HEADER = "IP,Port,Username,Password,Type,Status,Anonymity,Country,Response Time";
 
     private ExportCommand() {
     }
@@ -63,7 +61,7 @@ public final class ExportCommand {
         File file = FileCommand.getFileToSave(true);
         if (file != null) {
             try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-                writeCsv(tableView.getItems(), writer);
+                ProxyExporter.writeCsv(tableView.getItems(), writer);
                 AlertBox.show(Alert.AlertType.INFORMATION, "Table Exported",
                         "The table has been successfully exported to disk!");
             } catch (IOException e) {
@@ -89,7 +87,7 @@ public final class ExportCommand {
         if (file != null) {
             try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
                 for (Proxy proxy : tableView.getItems()) {
-                    if (matches(proxy, proxyStatus, proxyAnonymity)) {
+                    if (ProxyExporter.matches(proxy, proxyStatus, proxyAnonymity)) {
                         writer.write(proxy.getSpec()); // as loaded, keeping credentials
                         writer.write('\n');
                     }
@@ -101,42 +99,5 @@ public final class ExportCommand {
                         "Unable to export the data. Error: " + e.getMessage());
             }
         }
-    }
-
-    /**
-     * Writes the proxies as CSV (RFC 4180) with a header row.
-     */
-    static void writeCsv(List<Proxy> proxies, Appendable out) throws IOException {
-        out.append(CSV_HEADER).append('\n');
-        for (Proxy proxy : proxies) {
-            out.append(csvField(proxy.getIp())).append(',')
-                    .append(String.valueOf(proxy.getPort())).append(',')
-                    .append(csvField(proxy.getUsername())).append(',')
-                    .append(csvField(proxy.getPassword())).append(',')
-                    .append(csvField(proxy.getProxyType())).append(',')
-                    .append(csvField(proxy.getProxyStatus())).append(',')
-                    .append(csvField(proxy.getProxyAnonymity())).append(',')
-                    .append(csvField(proxy.getCountry())).append(',')
-                    .append(csvField(proxy.getResponseTime())).append('\n');
-        }
-    }
-
-    /**
-     * Quotes a CSV field when needed, e.g. country names such as "Korea, Republic of". Null becomes empty.
-     */
-    static String csvField(Object value) {
-        if (value == null) {
-            return "";
-        }
-        String text = value.toString();
-        if (text.indexOf(',') >= 0 || text.indexOf('"') >= 0 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
-            return '"' + text.replace("\"", "\"\"") + '"';
-        }
-        return text;
-    }
-
-    static boolean matches(Proxy proxy, ProxyStatus proxyStatus, ProxyAnonymity proxyAnonymity) {
-        return proxy.getProxyStatus() == proxyStatus
-                && (proxyAnonymity == null || proxyAnonymity == proxy.getProxyAnonymity());
     }
 }

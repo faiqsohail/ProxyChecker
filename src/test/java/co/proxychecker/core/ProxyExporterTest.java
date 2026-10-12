@@ -1,4 +1,4 @@
-package co.proxychecker.commands;
+package co.proxychecker.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,14 +14,14 @@ import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.components.entities.ProxyAnonymity;
 import co.proxychecker.components.entities.ProxyStatus;
 
-class ExportCommandTest {
+class ProxyExporterTest {
 
     @Test
     void escapesCsvFields() {
-        assertEquals("", ExportCommand.csvField(null));
-        assertEquals("plain", ExportCommand.csvField("plain"));
-        assertEquals("\"Korea, Republic of\"", ExportCommand.csvField("Korea, Republic of"));
-        assertEquals("\"say \"\"hi\"\"\"", ExportCommand.csvField("say \"hi\""));
+        assertEquals("", ProxyExporter.csvField(null));
+        assertEquals("plain", ProxyExporter.csvField("plain"));
+        assertEquals("\"Korea, Republic of\"", ProxyExporter.csvField("Korea, Republic of"));
+        assertEquals("\"say \"\"hi\"\"\"", ProxyExporter.csvField("say \"hi\""));
     }
 
     @Test
@@ -33,9 +33,9 @@ class ExportCommandTest {
         dead.setProxyAnonymity(null);
 
         StringBuilder out = new StringBuilder();
-        ExportCommand.writeCsv(Arrays.asList(alive, dead), out);
+        ProxyExporter.writeCsv(Arrays.asList(alive, dead), out);
 
-        assertEquals(ExportCommand.CSV_HEADER + "\n"
+        assertEquals(ProxyExporter.CSV_HEADER + "\n"
                 + "1.2.3.4,80,,,HTTP,ALIVE,ELITE,\"Korea, Republic of\",12 (ms)\n"
                 + "5.6.7.8,8080,bob,\"p,w\",SOCKS5,DEAD,,,\n", out.toString());
     }
@@ -44,9 +44,9 @@ class ExportCommandTest {
     void filtersByStatusAndAnonymity() {
         Proxy proxy = new Proxy("1.2.3.4:80", ProxyType.HTTP);
         proxy.setProxyStatus(ProxyStatus.ALIVE).setProxyAnonymity(ProxyAnonymity.ANONYMOUS);
-        assertTrue(ExportCommand.matches(proxy, ProxyStatus.ALIVE, null));
-        assertTrue(ExportCommand.matches(proxy, ProxyStatus.ALIVE, ProxyAnonymity.ANONYMOUS));
-        assertFalse(ExportCommand.matches(proxy, ProxyStatus.ALIVE, ProxyAnonymity.ELITE));
-        assertFalse(ExportCommand.matches(proxy, ProxyStatus.DEAD, null));
+        assertTrue(ProxyExporter.matches(proxy, ProxyStatus.ALIVE, null));
+        assertTrue(ProxyExporter.matches(proxy, ProxyStatus.ALIVE, ProxyAnonymity.ANONYMOUS));
+        assertFalse(ProxyExporter.matches(proxy, ProxyStatus.ALIVE, ProxyAnonymity.ELITE));
+        assertFalse(ProxyExporter.matches(proxy, ProxyStatus.DEAD, null));
     }
 }

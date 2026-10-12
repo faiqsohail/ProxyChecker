@@ -126,7 +126,10 @@ public final class ProxyHttpClient {
         }
     }
 
-    static String basicAuth(String username, String password) {
+    /**
+     * @return the value of a Basic {@code Proxy-Authorization} header
+     */
+    public static String basicAuth(String username, String password) {
         String credentials = username + ":" + (password == null ? "" : password);
         return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
