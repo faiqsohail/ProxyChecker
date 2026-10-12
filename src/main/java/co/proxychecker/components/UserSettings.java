@@ -1,11 +1,11 @@
 package co.proxychecker.components;
 
-import java.net.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 
 import co.proxychecker.components.entities.AnonymityColor;
 import co.proxychecker.components.entities.ProxyAnonymity;
+import co.proxychecker.components.entities.ProxyType;
 
 /**
  * Manages the user configurable system settings.
@@ -21,7 +21,7 @@ public class UserSettings {
     private int timeout = DEFAULT_TIMEOUT; // timeout for checking the proxy (ms)
     private int threads = DEFAULT_THREADS; // max threads
     private String ip = "0.0.0.0"; // ip address of the user
-    private Proxy.Type type = Proxy.Type.HTTP;
+    private ProxyType type = ProxyType.HTTP;
 
     private List<AnonymityColor> colorScheme = defaultColorScheme();
 
@@ -48,8 +48,8 @@ public class UserSettings {
         } else if (threads > MAX_THREADS) {
             threads = MAX_THREADS;
         }
-        if (type == null || type == Proxy.Type.DIRECT) {
-            type = Proxy.Type.HTTP;
+        if (type == null) {
+            type = ProxyType.HTTP;
         }
         if (ip == null) {
             ip = "0.0.0.0";
@@ -89,11 +89,11 @@ public class UserSettings {
         return this;
     }
 
-    public Proxy.Type getProxyType() {
+    public ProxyType getProxyType() {
         return type;
     }
 
-    public UserSettings setProxyType(Proxy.Type type) {
+    public UserSettings setProxyType(ProxyType type) {
         this.type = type;
         return this;
     }

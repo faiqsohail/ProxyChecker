@@ -1,7 +1,6 @@
 package co.proxychecker.commands;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -138,9 +137,7 @@ public final class ProxyCheckCommand {
      */
     static void testProxy(Proxy proxy, RequestAPI requestAPI) {
         try {
-            java.net.Proxy netProxy = new java.net.Proxy(proxy.getProxyType(),
-                    new InetSocketAddress(proxy.getIp(), proxy.getPort()));
-            RequestAPI.Result result = requestAPI.request(netProxy);
+            RequestAPI.Result result = requestAPI.request(proxy);
             if (result.getResponse().anonymity == null) {
                 throw new IOException("API response did not contain an anonymity level");
             }

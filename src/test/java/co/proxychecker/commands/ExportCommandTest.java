@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.Proxy.Type;
+import co.proxychecker.components.entities.ProxyType;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
@@ -26,10 +26,10 @@ class ExportCommandTest {
 
     @Test
     void writesCsvWithHeader() throws IOException {
-        Proxy alive = new Proxy("1.2.3.4:80", Type.HTTP);
+        Proxy alive = new Proxy("1.2.3.4:80", ProxyType.HTTP);
         alive.setProxyStatus(ProxyStatus.ALIVE).setProxyAnonymity(ProxyAnonymity.ELITE)
                 .setCountry("Korea, Republic of").setResponseTime("12 (ms)");
-        Proxy dead = new Proxy("5.6.7.8:8080", Type.HTTP);
+        Proxy dead = new Proxy("5.6.7.8:8080", ProxyType.HTTP);
         dead.setProxyAnonymity(null);
 
         StringBuilder out = new StringBuilder();
@@ -42,7 +42,7 @@ class ExportCommandTest {
 
     @Test
     void filtersByStatusAndAnonymity() {
-        Proxy proxy = new Proxy("1.2.3.4:80", Type.HTTP);
+        Proxy proxy = new Proxy("1.2.3.4:80", ProxyType.HTTP);
         proxy.setProxyStatus(ProxyStatus.ALIVE).setProxyAnonymity(ProxyAnonymity.ANONYMOUS);
         assertTrue(ExportCommand.matches(proxy, ProxyStatus.ALIVE, null));
         assertTrue(ExportCommand.matches(proxy, ProxyStatus.ALIVE, ProxyAnonymity.ANONYMOUS));

@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import co.proxychecker.components.entities.ProxyAnonymity;
+import co.proxychecker.components.entities.ProxyType;
 
 class SettingsTest {
 
@@ -51,7 +51,7 @@ class SettingsTest {
         assertEquals(3000, settings.getTimeout());
         assertEquals(50, settings.getThreads());
         assertEquals("1.2.3.4", settings.getIp());
-        assertEquals(Proxy.Type.SOCKS, settings.getProxyType());
+        assertEquals(ProxyType.SOCKS5, settings.getProxyType());
         assertEquals("#010203", settings.getColor(ProxyAnonymity.ELITE));
     }
 
@@ -63,16 +63,16 @@ class SettingsTest {
         UserSettings settings = Settings.loadConfig(config);
         assertEquals(UserSettings.DEFAULT_TIMEOUT, settings.getTimeout());
         assertEquals(UserSettings.MAX_THREADS, settings.getThreads());
-        assertEquals(Proxy.Type.HTTP, settings.getProxyType());
+        assertEquals(ProxyType.HTTP, settings.getProxyType());
         assertEquals("#b3e6b3", settings.getColor(ProxyAnonymity.ELITE));
     }
 
     @Test
     void roundTripsSettings() throws IOException {
         Path config = dir.resolve("nested").resolve("config.json");
-        Settings.writeConfig(config, new UserSettings().setThreads(7).setProxyType(Proxy.Type.SOCKS));
+        Settings.writeConfig(config, new UserSettings().setThreads(7).setProxyType(ProxyType.SOCKS5));
         UserSettings settings = Settings.loadConfig(config);
         assertEquals(7, settings.getThreads());
-        assertEquals(Proxy.Type.SOCKS, settings.getProxyType());
+        assertEquals(ProxyType.SOCKS5, settings.getProxyType());
     }
 }

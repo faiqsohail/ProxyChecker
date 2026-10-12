@@ -10,7 +10,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 
 ### Features
 * GUI based
-* Check SOCKS or HTTP Proxies
+* Check HTTP, SOCKS4/4a and SOCKS5 Proxies
 * Multithreaded & Multiplatform
 * Filters and Removes Duplicate Proxies
 * Ability to Load from multiple Proxy Lists

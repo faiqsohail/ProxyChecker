@@ -1,7 +1,5 @@
 package co.proxychecker.components.entities;
 
-import java.net.Proxy.Type;
-
 /**
  * A single proxy and the result of checking it.
  */
@@ -13,7 +11,7 @@ public class Proxy {
     private final String ip;
     private final int port;
 
-    private Type type;
+    private ProxyType type;
     private ProxyStatus status = ProxyStatus.DEAD; // assume the proxy is dead until checked
     private ProxyAnonymity anonymity = ProxyAnonymity.TRANSPARENT;
     private String country;
@@ -23,10 +21,10 @@ public class Proxy {
      * Creates a proxy from a string in the format {@code host:port}.
      *
      * @param ipPort host and port, see {@link #isValidFormat(String)}
-     * @param type   either HTTP or SOCKS
+     * @param type   the proxy protocol
      * @throws IllegalArgumentException if the string is not a valid proxy
      */
-    public Proxy(String ipPort, Type type) {
+    public Proxy(String ipPort, ProxyType type) {
         String[] parts = split(ipPort);
         if (parts == null) {
             throw new IllegalArgumentException("Invalid proxy format, expected host:port but got: " + ipPort);
@@ -97,11 +95,11 @@ public class Proxy {
         return this;
     }
 
-    public Type getProxyType() {
+    public ProxyType getProxyType() {
         return type;
     }
 
-    public Proxy setProxyType(Type type) {
+    public Proxy setProxyType(ProxyType type) {
         this.type = type;
         return this;
     }

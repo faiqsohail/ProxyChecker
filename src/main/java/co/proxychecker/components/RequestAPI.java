@@ -1,31 +1,32 @@
 package co.proxychecker.components;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.Proxy;
-import java.net.URL;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 
+import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.components.entities.ProxyAnonymity;
+import co.proxychecker.components.net.ProxyHttpClient;
 
 /**
- * Makes requests to the proxy judge API server.
+ * Makes requests to the proxy judge API server, directly or through a proxy.
  */
 public class RequestAPI {
 
-    private static final String API_URL = "http://api.proxychecker.co/";
-    /** Upper bound on the response body, a misbehaving proxy must not be able to exhaust memory. */
-    private static final int MAX_RESPONSE_BYTES = 64 * 1024;
+    public static final String DEFAULT_API_URL = "http://api.proxychecker.co/";
     private static final Gson GSON = new Gson();
 
     private final UserSettings settings;
+    private final String apiUrl;
 
     /**
      * The response given by the API server.
@@ -60,47 +61,39 @@ public class RequestAPI {
     }
 
     public RequestAPI(UserSettings settings) {
-        this.settings = settings;
+        this(settings, DEFAULT_API_URL);
     }
 
     /**
-     * Requests the API server, optionally through the given proxy. The connection is always released,
-     * and the response time covers the full round trip (not only the TCP connect to the proxy).
+     * @param apiUrl base URL of a compatible proxy judge API ({@code http://} only)
+     */
+    public RequestAPI(UserSettings settings, String apiUrl) {
+        this.settings = settings;
+        this.apiUrl = apiUrl.endsWith("/") ? apiUrl : apiUrl + "/";
+    }
+
+    /**
+     * Requests the API server, optionally through the given proxy. The response time covers the full
+     * round trip (including the proxy handshake).
      *
      * @param proxy the proxy to tunnel the request through, or null for a direct request
      * @return the parsed response
      * @throws IOException if the request fails, times out, or returns anything other than a valid API response
      */
     public Result request(Proxy proxy) throws IOException {
-        URL url = new URL(proxy == null ? API_URL : getQueryUrl(settings.getIp()));
-        HttpURLConnection connection = (HttpURLConnection) (proxy == null
-                ? url.openConnection()
-                : url.openConnection(proxy));
-        try {
-            connection.setRequestProperty("User-Agent", "Proxy Checker v." + Settings.getApplicationVersion()
-                    + " - (proxychecker.co) : " + System.getProperty("os.name")
-                    + " v." + System.getProperty("os.version"));
-            connection.setRequestMethod("GET");
-            connection.setUseCaches(false);
-            connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(settings.getTimeout());
-            connection.setReadTimeout(settings.getTimeout());
+        URI uri = toUri(proxy == null ? apiUrl : getQueryUrl(settings.getIp()));
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("User-Agent", "Proxy Checker v." + Settings.getApplicationVersion()
+                + " - (proxychecker.co) : " + System.getProperty("os.name")
+                + " v." + System.getProperty("os.version"));
 
-            long start = System.nanoTime();
-            int status = connection.getResponseCode();
-            if (status != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Unexpected HTTP status " + status);
-            }
-            String body;
-            try (InputStream in = connection.getInputStream()) {
-                body = readLimited(in);
-            }
-            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-
-            return new Result(parseResponse(body), elapsed);
-        } finally {
-            connection.disconnect();
+        long start = System.nanoTime();
+        ProxyHttpClient.Response response = new ProxyHttpClient(settings.getTimeout()).get(uri, proxy, headers);
+        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        if (response.getStatus() != 200) {
+            throw new IOException("Unexpected HTTP status " + response.getStatus());
         }
+        return new Result(parseResponse(response.getBody()), elapsed);
     }
 
     /**
@@ -121,26 +114,21 @@ public class RequestAPI {
         return response;
     }
 
-    private static String readLimited(InputStream in) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buffer = new byte[4096];
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-            if (out.size() + read > MAX_RESPONSE_BYTES) {
-                throw new IOException("API response too large");
-            }
-            out.write(buffer, 0, read);
+    private static URI toUri(String url) throws IOException {
+        try {
+            return new URI(url);
+        } catch (URISyntaxException e) {
+            throw new IOException("Invalid API URL: " + url, e);
         }
-        return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 
-    private static String getQueryUrl(String ip) {
+    private String getQueryUrl(String ip) {
         if (ip == null) {
-            return API_URL;
+            return apiUrl;
         }
         try {
-            return API_URL + "?ip=" + URLEncoder.encode(ip, StandardCharsets.UTF_8.name());
-        } catch (java.io.UnsupportedEncodingException e) {
+            return apiUrl + "?ip=" + URLEncoder.encode(ip, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException(e); // UTF-8 is always supported
         }
     }

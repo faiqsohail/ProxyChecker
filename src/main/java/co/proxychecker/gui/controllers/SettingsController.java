@@ -1,6 +1,5 @@
 package co.proxychecker.gui.controllers;
 
-import java.net.Proxy;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +19,7 @@ import co.proxychecker.components.Settings;
 import co.proxychecker.components.UserSettings;
 import co.proxychecker.components.entities.AnonymityColor;
 import co.proxychecker.components.entities.ProxyAnonymity;
+import co.proxychecker.components.entities.ProxyType;
 import co.proxychecker.gui.AlertBox;
 
 /**
@@ -52,7 +52,9 @@ public class SettingsController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        proxyTypeCombo.getItems().addAll(Proxy.Type.HTTP.name(), Proxy.Type.SOCKS.name());
+        for (ProxyType type : ProxyType.values()) {
+            proxyTypeCombo.getItems().add(type.name());
+        }
 
         // show current settings
         proxyTypeCombo.getSelectionModel().select(settings.getProxyType().name());
@@ -101,7 +103,7 @@ public class SettingsController implements Initializable {
                     "The number of threads must be between " + UserSettings.MIN_THREADS + " and "
                             + UserSettings.MAX_THREADS + ".");
         } else {
-            Proxy.Type type = Proxy.Type.valueOf(proxyTypeCombo.getSelectionModel().getSelectedItem());
+            ProxyType type = ProxyType.valueOf(proxyTypeCombo.getSelectionModel().getSelectedItem());
             settings.setThreads(threads).setTimeout(timeout).setProxyType(type);
             if (Settings.saveConfig(settings)) {
                 AlertBox.show(Alert.AlertType.INFORMATION, "Changes Saved",

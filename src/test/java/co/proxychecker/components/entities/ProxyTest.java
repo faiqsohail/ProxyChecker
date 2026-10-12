@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.Proxy.Type;
+import co.proxychecker.components.entities.ProxyType;
 
 import org.junit.jupiter.api.Test;
 
@@ -35,15 +35,15 @@ class ProxyTest {
 
     @Test
     void parsesHostAndPort() {
-        Proxy proxy = new Proxy(" 10.0.0.1:3128 ", Type.SOCKS);
+        Proxy proxy = new Proxy(" 10.0.0.1:3128 ", ProxyType.SOCKS5);
         assertEquals("10.0.0.1", proxy.getIp());
         assertEquals(3128, proxy.getPort());
-        assertEquals(Type.SOCKS, proxy.getProxyType());
+        assertEquals(ProxyType.SOCKS5, proxy.getProxyType());
         assertEquals(ProxyStatus.DEAD, proxy.getProxyStatus());
     }
 
     @Test
     void rejectsInvalidConstructorInput() {
-        assertThrows(IllegalArgumentException.class, () -> new Proxy("nope", Type.HTTP));
+        assertThrows(IllegalArgumentException.class, () -> new Proxy("nope", ProxyType.HTTP));
     }
 }

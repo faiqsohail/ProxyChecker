@@ -24,6 +24,7 @@ import co.proxychecker.components.UserSettings;
 import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.components.entities.ProxyAnonymity;
 import co.proxychecker.components.entities.ProxyStatus;
+import co.proxychecker.components.entities.ProxyType;
 
 class ProxyCheckCommandTest {
 
@@ -111,7 +112,7 @@ class ProxyCheckCommandTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        Proxy proxy = new Proxy("127.0.0.1:" + port, java.net.Proxy.Type.HTTP);
+        Proxy proxy = new Proxy("127.0.0.1:" + port, ProxyType.HTTP);
         ProxyCheckCommand.testProxy(proxy, new RequestAPI(new UserSettings().setTimeout(1000)));
         assertEquals(ProxyStatus.DEAD, proxy.getProxyStatus());
     }
@@ -145,7 +146,7 @@ class ProxyCheckCommandTest {
             thread.setDaemon(true);
             thread.start();
 
-            Proxy proxy = new Proxy("127.0.0.1:" + server.getLocalPort(), java.net.Proxy.Type.HTTP);
+            Proxy proxy = new Proxy("127.0.0.1:" + server.getLocalPort(), ProxyType.HTTP);
             ProxyCheckCommand.testProxy(proxy, new RequestAPI(new UserSettings().setTimeout(5000)));
             thread.join(5000);
             return proxy;
