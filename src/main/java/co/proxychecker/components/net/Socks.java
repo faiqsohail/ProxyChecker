@@ -12,8 +12,9 @@ import java.util.regex.Pattern;
 
 /**
  * Client side SOCKS4/4a (http://www.openssh.com/txt/socks4.protocol) and SOCKS5 (RFC 1928, RFC 1929)
- * handshakes. Implemented by hand because the JDK has no SOCKS4 client and so every connection carries
- * its own settings.
+ * handshakes. Implemented by hand because the JDK has no SOCKS4 client, and so every connection carries
+ * its own credentials: the JDK only supports SOCKS5 credentials through the JVM-wide
+ * {@link java.net.Authenticator}, which can't safely serve many proxies with different credentials at once.
  */
 final class Socks {
 
@@ -39,9 +40,12 @@ final class Socks {
      * Performs a SOCKS4 CONNECT. Uses the target's IPv4 address when it can be resolved locally
      * (plain SOCKS4, supported by every server) and SOCKS4a remote resolution otherwise.
      *
+     *
+     * @param userId the SOCKS4 user id (SOCKS4 has no passwords), may be null
      */
-    static void connect4(InputStream in, OutputStream out, String host, int port) throws IOException {
-        connect4(in, out, host, port, Socks::resolveIPv4);
+    static void connect4(InputStream in, OutputStream out, String host, int port, String userId)
+            throws IOException {
+        connect4(in, out, host, port, userId, Socks::resolveIPv4);
     }
 
     /** Resolves a host name to an IPv4 address, or null if it can't be resolved. */
@@ -50,8 +54,8 @@ final class Socks {
         byte[] resolve(String host);
     }
 
-    static void connect4(InputStream in, OutputStream out, String host, int port, Resolver resolver)
-            throws IOException {
+    static void connect4(InputStream in, OutputStream out, String host, int port, String userId,
+                         Resolver resolver) throws IOException {
         byte[] address = resolver.resolve(host);
         boolean socks4a = address == null;
         if (socks4a) {
@@ -61,7 +65,10 @@ final class Socks {
         out.write(SOCKS4_CONNECT);
         writePort(out, port);
         out.write(address);
-        out.write(0); // empty user id
+        if (userId != null) {
+            out.write(userId.getBytes(StandardCharsets.UTF_8));
+        }
+        out.write(0);
         if (socks4a) {
             out.write(host.getBytes(StandardCharsets.US_ASCII));
             out.write(0);
@@ -79,10 +86,17 @@ final class Socks {
     }
 
     /**
-     * Performs a SOCKS5 CONNECT using the domain name of the target (remote DNS resolution).
+     * Performs a SOCKS5 CONNECT using the domain name of the target (remote DNS resolution),
+     * authenticating with username/password (RFC 1929) when credentials are given.
      */
-    static void connect5(InputStream in, OutputStream out, String host, int port) throws IOException {
-        out.write(new byte[] {SOCKS5_VERSION, 1, SOCKS5_NO_AUTH});
+    static void connect5(InputStream in, OutputStream out, String host, int port,
+                         String username, String password) throws IOException {
+        boolean withCredentials = username != null;
+        if (withCredentials) {
+            out.write(new byte[] {SOCKS5_VERSION, 2, SOCKS5_NO_AUTH, SOCKS5_USER_PASS});
+        } else {
+            out.write(new byte[] {SOCKS5_VERSION, 1, SOCKS5_NO_AUTH});
+        }
         out.flush();
 
         byte[] choice = readFully(in, 2);
@@ -91,7 +105,10 @@ final class Socks {
         }
         int method = choice[1] & 0xFF;
         if (method == SOCKS5_USER_PASS) {
-            throw new IOException("SOCKS5 proxy requires authentication");
+            if (!withCredentials) {
+                throw new IOException("SOCKS5 proxy requires authentication");
+            }
+            authenticate5(in, out, username, password == null ? "" : password);
         } else if (method == SOCKS5_NO_ACCEPTABLE) {
             throw new IOException("SOCKS5 proxy accepted none of the offered authentication methods");
         } else if (method != SOCKS5_NO_AUTH) {
@@ -138,6 +155,25 @@ final class Socks {
                 throw new IOException("Invalid SOCKS5 address type");
         }
         readFully(in, addressLength + 2); // bound address and port, unused
+    }
+
+    private static void authenticate5(InputStream in, OutputStream out, String username, String password)
+            throws IOException {
+        byte[] user = username.getBytes(StandardCharsets.UTF_8);
+        byte[] pass = password.getBytes(StandardCharsets.UTF_8);
+        if (user.length == 0 || user.length > 255 || pass.length > 255) {
+            throw new IOException("SOCKS5 username and password must be 1-255 bytes");
+        }
+        out.write(0x01); // sub-negotiation version
+        out.write(user.length);
+        out.write(user);
+        out.write(pass.length);
+        out.write(pass);
+        out.flush();
+        byte[] status = readFully(in, 2);
+        if (status[1] != 0x00) {
+            throw new IOException("SOCKS5 authentication failed");
+        }
     }
 
     /**

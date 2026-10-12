@@ -18,7 +18,7 @@ import co.proxychecker.components.entities.Proxy;
 import co.proxychecker.gui.AlertBox;
 
 /**
- * Loads proxies in the form {@code host:port} from files or user input onto a ListView.
+ * Loads proxies ({@code host:port}, {@code user:pass@host:port} or {@code host:port:user:pass}) from files or user input onto a ListView.
  */
 public final class LoadCommand {
 
@@ -62,7 +62,7 @@ public final class LoadCommand {
         String value = normalize(input);
         if (!Proxy.isValidFormat(value)) {
             AlertBox.show(Alert.AlertType.ERROR, "Invalid Proxy Format",
-                    "You must enter in a valid proxy in the format ip:port !");
+                    "You must enter a valid proxy in the format host:port, user:pass@host:port or host:port:user:pass");
         } else if (view.getItems().contains(value)) {
             AlertBox.show(Alert.AlertType.INFORMATION, "Already Loaded",
                     "The proxy you entered is already loaded and is ready to be checked!");

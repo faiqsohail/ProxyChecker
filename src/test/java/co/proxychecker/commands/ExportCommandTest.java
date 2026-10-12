@@ -29,15 +29,15 @@ class ExportCommandTest {
         Proxy alive = new Proxy("1.2.3.4:80", ProxyType.HTTP);
         alive.setProxyStatus(ProxyStatus.ALIVE).setProxyAnonymity(ProxyAnonymity.ELITE)
                 .setCountry("Korea, Republic of").setResponseTime("12 (ms)");
-        Proxy dead = new Proxy("5.6.7.8:8080", ProxyType.HTTP);
+        Proxy dead = new Proxy("bob:p,w@5.6.7.8:8080", ProxyType.SOCKS5);
         dead.setProxyAnonymity(null);
 
         StringBuilder out = new StringBuilder();
         ExportCommand.writeCsv(Arrays.asList(alive, dead), out);
 
         assertEquals(ExportCommand.CSV_HEADER + "\n"
-                + "1.2.3.4,80,ALIVE,ELITE,\"Korea, Republic of\",12 (ms)\n"
-                + "5.6.7.8,8080,DEAD,,,\n", out.toString());
+                + "1.2.3.4,80,,,HTTP,ALIVE,ELITE,\"Korea, Republic of\",12 (ms)\n"
+                + "5.6.7.8,8080,bob,\"p,w\",SOCKS5,DEAD,,,\n", out.toString());
     }
 
     @Test

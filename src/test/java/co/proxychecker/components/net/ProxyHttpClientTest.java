@@ -79,7 +79,7 @@ class ProxyHttpClientTest {
     void socks4aSendsHostNameWhenUnresolvable() throws Exception {
         java.io.ByteArrayOutputStream sent = new java.io.ByteArrayOutputStream();
         InputStream reply = new ByteArrayInputStream(new byte[] {0, 0x5A, 0, 0, 0, 0, 0, 0});
-        Socks.connect4(reply, sent, "judge.test.invalid", 80, host -> null);
+        Socks.connect4(reply, sent, "judge.test.invalid", 80, null, host -> null);
         byte[] expected = "\u0004\u0001\u0000P\u0000\u0000\u0000\u0001\u0000judge.test.invalid\u0000"
                 .getBytes(StandardCharsets.ISO_8859_1);
         org.junit.jupiter.api.Assertions.assertArrayEquals(expected, sent.toByteArray());

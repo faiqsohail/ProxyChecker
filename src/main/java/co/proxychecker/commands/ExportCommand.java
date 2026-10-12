@@ -21,7 +21,7 @@ import co.proxychecker.components.entities.ProxyAnonymity;
  */
 public final class ExportCommand {
 
-    static final String CSV_HEADER = "IP,Port,Status,Anonymity,Country,Response Time";
+    static final String CSV_HEADER = "IP,Port,Username,Password,Type,Status,Anonymity,Country,Response Time";
 
     private ExportCommand() {
     }
@@ -90,7 +90,7 @@ public final class ExportCommand {
             try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
                 for (Proxy proxy : tableView.getItems()) {
                     if (matches(proxy, proxyStatus, proxyAnonymity)) {
-                        writer.write(proxy.getIp() + ":" + proxy.getPort());
+                        writer.write(proxy.getSpec()); // as loaded, keeping credentials
                         writer.write('\n');
                     }
                 }
@@ -111,6 +111,9 @@ public final class ExportCommand {
         for (Proxy proxy : proxies) {
             out.append(csvField(proxy.getIp())).append(',')
                     .append(String.valueOf(proxy.getPort())).append(',')
+                    .append(csvField(proxy.getUsername())).append(',')
+                    .append(csvField(proxy.getPassword())).append(',')
+                    .append(csvField(proxy.getProxyType())).append(',')
                     .append(csvField(proxy.getProxyStatus())).append(',')
                     .append(csvField(proxy.getProxyAnonymity())).append(',')
                     .append(csvField(proxy.getCountry())).append(',')

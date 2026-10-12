@@ -11,6 +11,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 ### Features
 * GUI based
 * Check HTTP, SOCKS4/4a and SOCKS5 Proxies
+* Authenticated proxies (HTTP Basic, SOCKS5 username/password, SOCKS4 user id)
 * Multithreaded & Multiplatform
 * Filters and Removes Duplicate Proxies
 * Ability to Load from multiple Proxy Lists
@@ -21,6 +22,15 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 * Java 11+ (the packaged releases bundle JavaFX)
 * Internet Connection :)
 
+
+### Proxy List Format
+One proxy per line, in any of these formats:
+```
+203.0.113.10:8080
+user:password@203.0.113.10:1080
+203.0.113.10:1080:user:password
+```
+Passwords may contain `:` (and `@` in the `user:password@host:port` form). Exports keep each proxy exactly as it was loaded, credentials included.
 
 ### Installation & Usage
 Simply download the latest packaged release for your system and run!

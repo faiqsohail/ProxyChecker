@@ -2,14 +2,19 @@ package co.proxychecker.components.entities;
 
 /**
  * A single proxy and the result of checking it.
+ * <p>
+ * Accepted formats: {@code host:port}, {@code user:pass@host:port} and {@code host:port:user:pass}.
  */
 public class Proxy {
 
     private static final int MIN_PORT = 1;
     private static final int MAX_PORT = 65535;
 
+    private final String spec;
     private final String ip;
     private final int port;
+    private final String username;
+    private final String password;
 
     private ProxyType type;
     private ProxyStatus status = ProxyStatus.DEAD; // assume the proxy is dead until checked
@@ -18,52 +23,98 @@ public class Proxy {
     private String responseTime;
 
     /**
-     * Creates a proxy from a string in the format {@code host:port}.
+     * Parsed parts of a proxy string.
+     */
+    private static final class Parts {
+        final String host;
+        final int port;
+        final String username;
+        final String password;
+
+        Parts(String host, int port, String username, String password) {
+            this.host = host;
+            this.port = port;
+            this.username = username;
+            this.password = password;
+        }
+    }
+
+    /**
+     * Creates a proxy from a string in one of the accepted formats.
      *
-     * @param ipPort host and port, see {@link #isValidFormat(String)}
-     * @param type   the proxy protocol
+     * @param spec proxy string, see {@link #isValidFormat(String)}
+     * @param type the proxy protocol
      * @throws IllegalArgumentException if the string is not a valid proxy
      */
-    public Proxy(String ipPort, ProxyType type) {
-        String[] parts = split(ipPort);
+    public Proxy(String spec, ProxyType type) {
+        Parts parts = parse(spec);
         if (parts == null) {
-            throw new IllegalArgumentException("Invalid proxy format, expected host:port but got: " + ipPort);
+            throw new IllegalArgumentException("Invalid proxy format, expected host:port, user:pass@host:port "
+                    + "or host:port:user:pass");
         }
-        this.ip = parts[0];
-        this.port = Integer.parseInt(parts[1]);
+        this.spec = spec.trim();
+        this.ip = parts.host;
+        this.port = parts.port;
+        this.username = parts.username;
+        this.password = parts.password;
         this.type = type;
     }
 
     /**
-     * Determines whether a string is a valid proxy: a non empty host, a single colon and a port between
-     * 1 and 65535. Surrounding whitespace is ignored.
+     * Determines whether a string is a valid proxy: {@code host:port}, {@code user:pass@host:port} or
+     * {@code host:port:user:pass}, with a non empty host and user name and a port between 1 and 65535.
+     * Surrounding whitespace is ignored. Passwords may contain ':' (and '@' in the second format).
      */
-    public static boolean isValidFormat(String ipPort) {
-        return split(ipPort) != null;
+    public static boolean isValidFormat(String spec) {
+        return parse(spec) != null;
     }
 
-    /**
-     * @return {host, port} or null if the string is not a valid proxy
-     */
-    private static String[] split(String ipPort) {
-        if (ipPort == null) {
+    private static Parts parse(String spec) {
+        if (spec == null) {
             return null;
         }
-        String[] parts = ipPort.trim().split(":");
-        if (parts.length != 2) {
-            return null;
-        }
-        String host = parts[0].trim();
-        String portText = parts[1].trim();
-        try {
-            int port = Integer.parseInt(portText);
-            if (host.isEmpty() || port < MIN_PORT || port > MAX_PORT) {
+        String value = spec.trim();
+        int at = value.lastIndexOf('@');
+        if (at >= 0) { // user:pass@host:port
+            String credentials = value.substring(0, at);
+            int colon = credentials.indexOf(':');
+            if (colon <= 0) {
                 return null;
             }
-            return new String[] {host, String.valueOf(port)};
+            String[] hostPort = value.substring(at + 1).split(":", -1);
+            if (hostPort.length != 2) {
+                return null;
+            }
+            return parts(hostPort[0], hostPort[1], credentials.substring(0, colon), credentials.substring(colon + 1));
+        }
+        String[] fields = value.split(":", 4);
+        if (fields.length == 2) { // host:port
+            return parts(fields[0], fields[1], null, null);
+        }
+        if (fields.length == 4 && !fields[2].isEmpty()) { // host:port:user:pass
+            return parts(fields[0], fields[1], fields[2], fields[3]);
+        }
+        return null;
+    }
+
+    private static Parts parts(String host, String portText, String username, String password) {
+        String trimmedHost = host.trim();
+        try {
+            int port = Integer.parseInt(portText.trim());
+            if (trimmedHost.isEmpty() || trimmedHost.contains(" ") || port < MIN_PORT || port > MAX_PORT) {
+                return null;
+            }
+            return new Parts(trimmedHost, port, username, password);
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * @return the proxy exactly as it was loaded (including credentials, if any)
+     */
+    public String getSpec() {
+        return spec;
     }
 
     public String getIp() {
@@ -72,6 +123,24 @@ public class Proxy {
 
     public int getPort() {
         return port;
+    }
+
+    /**
+     * @return the user name, or null if the proxy has no credentials
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    /**
+     * @return the password, or null if the proxy has no credentials
+     */
+    public String getPassword() {
+        return password;
+    }
+
+    public boolean hasCredentials() {
+        return username != null;
     }
 
     public String getCountry() {
@@ -123,5 +192,13 @@ public class Proxy {
     public Proxy setProxyAnonymity(ProxyAnonymity anonymity) {
         this.anonymity = anonymity;
         return this;
+    }
+
+    /**
+     * @return {@code host:port}, never including credentials (safe for logs)
+     */
+    @Override
+    public String toString() {
+        return ip + ":" + port;
     }
 }

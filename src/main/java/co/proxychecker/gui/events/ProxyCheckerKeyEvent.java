@@ -13,7 +13,7 @@ import co.proxychecker.components.entities.Proxy;
 
 /**
  * Key handler for the loaded proxies list (Delete/Backspace removes the selected proxy) and the
- * result table (C copies the selected proxy as {@code ip:port}).
+ * result table (C copies the selected proxy as it was loaded, including credentials).
  */
 public class ProxyCheckerKeyEvent implements EventHandler<KeyEvent> {
 
@@ -46,7 +46,7 @@ public class ProxyCheckerKeyEvent implements EventHandler<KeyEvent> {
         if (selected instanceof Proxy) {
             Proxy proxy = (Proxy) selected;
             ClipboardContent content = new ClipboardContent();
-            content.putString(proxy.getIp() + ":" + proxy.getPort());
+            content.putString(proxy.getSpec());
             Clipboard.getSystemClipboard().setContent(content);
         }
     }

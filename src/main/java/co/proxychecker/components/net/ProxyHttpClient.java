@@ -13,6 +13,7 @@ import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -93,12 +94,16 @@ public final class ProxyHttpClient {
                 switch (proxy.getProxyType()) {
                     case HTTP:
                         requestTarget = "http://" + hostHeader(host, port) + requestTarget;
+                        if (proxy.hasCredentials()) {
+                            extraHeaders.append("Proxy-Authorization: ")
+                                    .append(basicAuth(proxy.getUsername(), proxy.getPassword())).append("\r\n");
+                        }
                         break;
                     case SOCKS4:
-                        Socks.connect4(in, out, host, port);
+                        Socks.connect4(in, out, host, port, proxy.getUsername());
                         break;
                     case SOCKS5:
-                        Socks.connect5(in, out, host, port);
+                        Socks.connect5(in, out, host, port, proxy.getUsername(), proxy.getPassword());
                         break;
                     default:
                         throw new IllegalArgumentException("Unsupported proxy type " + proxy.getProxyType());
@@ -119,6 +124,11 @@ public final class ProxyHttpClient {
 
             return readResponse(in);
         }
+    }
+
+    static String basicAuth(String username, String password) {
+        String credentials = username + ":" + (password == null ? "" : password);
+        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String originForm(URI uri) {

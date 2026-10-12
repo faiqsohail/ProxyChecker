@@ -74,7 +74,7 @@ public final class ProxyCheckCommand {
             if (Proxy.isValidFormat(value)) {
                 toCheck.add(new Proxy(value, settings.getProxyType()));
             } else {
-                LOG.warning("Skipping invalid proxy: " + value);
+                LOG.warning("Skipping invalid proxy entry");
             }
         }
         if (toCheck.isEmpty()) {
@@ -117,7 +117,7 @@ public final class ProxyCheckCommand {
                     tester.test(proxy);
                 } catch (RuntimeException e) {
                     // never lose a result: an unexpected failure must not leave the check running forever
-                    LOG.log(Level.WARNING, "Unexpected error checking " + proxy.getIp() + ":" + proxy.getPort(), e);
+                    LOG.log(Level.WARNING, "Unexpected error checking " + proxy, e);
                     markDead(proxy);
                 }
                 pending.add(proxy);

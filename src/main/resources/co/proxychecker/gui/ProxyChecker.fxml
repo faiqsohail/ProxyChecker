@@ -79,7 +79,7 @@
                         <Insets top="5.0"/>
                     </padding>
                 </Label>
-                <TextField fx:id="inputField" prefHeight="38.0" prefWidth="259.0" promptText="hostname:port"
+                <TextField fx:id="inputField" prefHeight="38.0" prefWidth="259.0" promptText="host:port or user:pass@host:port"
                            onAction="#onInputAction">
                     <HBox.margin>
                         <Insets top="10.0"/>
