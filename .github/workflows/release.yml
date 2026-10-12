@@ -1,0 +1,94 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ['[0-9]*']        # bare version tags like 1.3 (the app's update check expects no "v")
+  pull_request:            # test builds on PRs (artifacts only, no release)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022    # has WiX 3, which jpackage needs for .exe
+            type: exe
+            suffix: windows-x64
+          - os: macos-13        # Intel
+            type: dmg
+            suffix: macos-x64
+          - os: macos-14        # Apple Silicon
+            type: dmg
+            suffix: macos-arm64
+          - os: ubuntu-latest   # plain jar (Linux JavaFX natives; CLI works anywhere)
+            type: jar
+            suffix: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="$GITHUB_REF_NAME"; else
+            V=$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout); fi
+          echo "VERSION=${V%-SNAPSHOT}" >> "$GITHUB_ENV"
+
+      - name: Build jar
+        run: mvn -B clean package
+
+      - name: Package installer
+        if: matrix.type != 'jar'
+        shell: bash
+        run: |
+          mkdir -p staging dist
+          cp target/ProxyChecker.jar staging/
+          EXTRA=()
+          if [[ "${{ matrix.type }}" == "exe" ]]; then
+            EXTRA+=(--win-menu --win-shortcut --win-dir-chooser --win-per-user-install)
+          else
+            EXTRA+=(--mac-package-name ProxyChecker)
+          fi
+          jpackage --type ${{ matrix.type }} \
+            --input staging --main-jar ProxyChecker.jar \
+            --main-class co.proxychecker.startup.Launcher \
+            --name ProxyChecker --app-version "$VERSION" \
+            --vendor faiqsohail \
+            --dest dist "${EXTRA[@]}"
+          for f in dist/*; do mv "$f" "dist/ProxyChecker-$VERSION-${{ matrix.suffix }}.${f##*.}"; done
+
+      - name: Collect jar
+        if: matrix.type == 'jar'
+        shell: bash
+        run: mkdir -p dist && cp target/ProxyChecker.jar dist/ProxyChecker.jar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 14
+          name: ProxyChecker-${{ matrix.suffix }}
+          path: dist/*
+
+  release:
+    needs: package
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ProxyChecker-v${{ github.ref_name }}
+          draft: true             # review, add notes, then publish
+          files: dist/*
