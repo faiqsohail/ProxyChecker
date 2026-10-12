@@ -46,7 +46,7 @@ class ProxyCheckCommandTest {
                     }
                     proxy.setProxyStatus(ProxyStatus.ALIVE);
                 },
-                Runnable::run, results::addAll, () -> {
+                Runnable::run, results::addAll, stopped -> {
                     completions.incrementAndGet();
                     done.countDown();
                 });
@@ -71,11 +71,11 @@ class ProxyCheckCommandTest {
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-                }, Runnable::run, r -> { }, done::countDown);
+                }, Runnable::run, r -> { }, stopped -> done.countDown());
 
         assertTrue(ProxyCheckCommand.isRunning());
         assertFalse(ProxyCheckCommand.check(Collections.singletonList("1.2.3.4:80"), new UserSettings(),
-                proxy -> { }, Runnable::run, r -> { }, () -> { }));
+                proxy -> { }, Runnable::run, r -> { }, stopped -> { }));
         release.countDown();
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertFalse(ProxyCheckCommand.isRunning());
@@ -85,7 +85,7 @@ class ProxyCheckCommandTest {
     void completesImmediatelyWhenNothingToCheck() {
         AtomicInteger completions = new AtomicInteger();
         assertTrue(ProxyCheckCommand.check(Arrays.asList("invalid", "1.2.3.4:99999"), new UserSettings(),
-                proxy -> { }, Runnable::run, r -> { }, completions::incrementAndGet));
+                proxy -> { }, Runnable::run, r -> { }, stopped -> completions.incrementAndGet()));
         assertEquals(1, completions.get());
         assertFalse(ProxyCheckCommand.isRunning());
     }
@@ -152,5 +152,40 @@ class ProxyCheckCommandTest {
             thread.join(5000);
             return proxy;
         }
+    }
+
+    @Test
+    void stopEndsTheRunningCheckAndAllowsANewOne() throws InterruptedException {
+        CountDownLatch inTester = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(1);
+        List<Boolean> outcomes = Collections.synchronizedList(new ArrayList<>());
+        assertTrue(ProxyCheckCommand.check(Arrays.asList("1.2.3.4:80", "1.2.3.5:80"), new UserSettings().setThreads(1),
+                proxy -> {
+                    inTester.countDown();
+                    try {
+                        Thread.sleep(60_000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }, Runnable::run, r -> { }, stopped -> {
+                    outcomes.add(stopped);
+                    done.countDown();
+                }));
+        assertTrue(inTester.await(5, TimeUnit.SECONDS));
+        assertTrue(ProxyCheckCommand.isRunning());
+        ProxyCheckCommand.stop();
+        assertTrue(done.await(2, TimeUnit.SECONDS));
+        assertEquals(Collections.singletonList(true), outcomes);
+        assertFalse(ProxyCheckCommand.isRunning());
+        ProxyCheckCommand.stop(); // nothing running: no-op
+
+        CountDownLatch second = new CountDownLatch(1);
+        assertTrue(ProxyCheckCommand.check(Collections.singletonList("1.2.3.4:80"), new UserSettings(),
+                proxy -> { }, Runnable::run, r -> { }, stopped -> {
+                    outcomes.add(stopped);
+                    second.countDown();
+                }));
+        assertTrue(second.await(2, TimeUnit.SECONDS));
+        assertEquals(Arrays.asList(true, false), outcomes);
     }
 }

@@ -47,6 +47,9 @@ public final class Cli {
     public static final int EXIT_NONE_WORKING = 1;
     public static final int EXIT_USAGE = 2;
     public static final int EXIT_IO = 3;
+    /** Stopped by Ctrl+C (SIGINT), matching the shell convention of 128 + signal number. */
+    public static final int EXIT_INTERRUPTED = 130;
+    private static final long SHUTDOWN_GRACE_SECONDS = 10;
 
     /** Live line refresh on a terminal. */
     static final long INTERACTIVE_INTERVAL_MILLIS = 250;
@@ -58,6 +61,8 @@ public final class Cli {
     private final PrintStream stderr;
     private final boolean interactive;
     private final long progressIntervalMillis;
+    private volatile boolean stopRequested;
+    private volatile ProxyCheckService.CheckHandle currentCheck;
 
     Cli(InputStream stdin, PrintStream stdout, PrintStream stderr, boolean interactive, long progressIntervalMillis) {
         this.stdin = stdin;
@@ -71,8 +76,34 @@ public final class Cli {
         // keep library warnings (e.g. about individual proxies) off the terminal
         Logger.getLogger("co.proxychecker").setLevel(Level.SEVERE);
         boolean terminal = isTerminal();
-        System.exit(new Cli(System.in, System.out, System.err, terminal,
-                terminal ? INTERACTIVE_INTERVAL_MILLIS : PLAIN_INTERVAL_MILLIS).run(args));
+        Cli cli = new Cli(System.in, System.out, System.err, terminal,
+                terminal ? INTERACTIVE_INTERVAL_MILLIS : PLAIN_INTERVAL_MILLIS);
+        CountDownLatch finished = new CountDownLatch(1);
+        // Ctrl+C / SIGTERM: stop the check and let run() write what was gathered before the JVM exits.
+        // The JVM exits with 128 + signal (130 for Ctrl+C) once this hook returns.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            cli.requestStop();
+            try {
+                finished.await(SHUTDOWN_GRACE_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "proxy-checker-shutdown"));
+        int code = cli.run(args);
+        finished.countDown();
+        System.exit(code);
+    }
+
+    /**
+     * Stops a running check as if interrupted: run() then writes the results gathered so far, prints the
+     * summary and returns {@link #EXIT_INTERRUPTED}. Safe to call from any thread, at any time.
+     */
+    void requestStop() {
+        stopRequested = true;
+        ProxyCheckService.CheckHandle handle = currentCheck;
+        if (handle != null) {
+            handle.stop();
+        }
     }
 
     /**
@@ -156,6 +187,10 @@ public final class Cli {
             }
         }
         settings.setIp(ip.trim());
+        if (stopRequested) {
+            stderr.println("Interrupted before checking started");
+            return EXIT_INTERRUPTED;
+        }
 
         String type = options.getType().name().toLowerCase(Locale.ROOT);
         String destination = (options.getOutput() == null ? "standard output" : options.getOutput())
@@ -183,6 +218,7 @@ public final class Cli {
         ProgressReporter progress = options.isQuiet() ? null
                 : new ProgressReporter(stderr, interactive, options.isVerbose(), proxies.size(), progressIntervalMillis);
         List<Proxy> results = runCheck(proxies, settings, api, progress);
+        boolean stopped = stopRequested;
         if (progress != null) {
             progress.finish();
         }
@@ -222,9 +258,10 @@ public final class Cli {
         }
 
         if (progress != null) {
-            stderr.printf(Locale.ROOT, "Done in %.1fs: %d checked, %d working (%d elite, %d anonymous, %d transparent),"
+            stderr.printf(Locale.ROOT, "%s %.1fs: %s checked, %d working (%d elite, %d anonymous, %d transparent),"
                             + " %d dead%n",
-                    progress.elapsedSeconds(), results.size(), working,
+                    stopped ? "Stopped after" : "Done in", progress.elapsedSeconds(),
+                    stopped ? results.size() + " of " + proxies.size() : String.valueOf(results.size()), working,
                     byAnonymity[ProxyAnonymity.ELITE.ordinal()],
                     byAnonymity[ProxyAnonymity.ANONYMOUS.ordinal()],
                     byAnonymity[ProxyAnonymity.TRANSPARENT.ordinal()],
@@ -239,8 +276,14 @@ public final class Cli {
                 }
                 stderr.println(line);
             }
+            if (stopped && results.size() < proxies.size()) {
+                stderr.println("Not checked: " + (proxies.size() - results.size()) + " (interrupted)");
+            }
             stderr.println("Wrote " + output.size() + " " + (output.size() == 1 ? "proxy" : "proxies")
                     + " to " + destination);
+        }
+        if (stopped) {
+            return EXIT_INTERRUPTED;
         }
         return working > 0 ? EXIT_OK : EXIT_NONE_WORKING;
     }
@@ -286,7 +329,7 @@ public final class Cli {
         return stats;
     }
 
-    private static List<Proxy> runCheck(List<Proxy> proxies, UserSettings settings, RequestAPI api,
+    private List<Proxy> runCheck(List<Proxy> proxies, UserSettings settings, RequestAPI api,
                                         ProgressReporter progress) {
         List<Proxy> results = new ArrayList<>(proxies.size());
         CountDownLatch done = new CountDownLatch(1);
@@ -295,7 +338,8 @@ public final class Cli {
             thread.setDaemon(true);
             return thread;
         });
-        ProxyCheckService.check(proxies, settings.getThreads(), ProxyCheckService.apiTester(api), callbacks,
+        ProxyCheckService.CheckHandle handle = ProxyCheckService.prepare(proxies, settings.getThreads(),
+                ProxyCheckService.apiTester(api), callbacks,
                 batch -> {
                     results.addAll(batch);
                     if (progress != null) {
@@ -305,6 +349,11 @@ public final class Cli {
                     }
                 },
                 done::countDown);
+        currentCheck = handle;
+        handle.start();
+        if (stopRequested) {
+            handle.stop(); // requestStop() ran before currentCheck was set
+        }
         try {
             done.await();
         } catch (InterruptedException e) {

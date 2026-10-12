@@ -75,55 +75,75 @@ public final class ProxyHttpClient {
         int port = uri.getPort() == -1 ? 80 : uri.getPort();
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2L * timeoutMillis);
 
+        Cancellation cancellation = Cancellation.current();
         try (Socket socket = new Socket()) {
-            socket.setSoTimeout(timeoutMillis);
-            InetSocketAddress endpoint = proxy == null
-                    ? new InetSocketAddress(host, port)
-                    : new InetSocketAddress(proxy.getIp(), proxy.getPort());
-            if (endpoint.isUnresolved()) {
-                throw new UnknownHostException(endpoint.getHostString());
+            if (cancellation != null) {
+                cancellation.register(socket);
             }
-            socket.connect(endpoint, timeoutMillis);
-
-            InputStream in = new BufferedInputStream(new DeadlineInputStream(socket.getInputStream(), deadline));
-            OutputStream out = new BufferedOutputStream(socket.getOutputStream());
-
-            String requestTarget = originForm(uri);
-            StringBuilder extraHeaders = new StringBuilder();
-            if (proxy != null) {
-                switch (proxy.getProxyType()) {
-                    case HTTP:
-                        requestTarget = "http://" + hostHeader(host, port) + requestTarget;
-                        if (proxy.hasCredentials()) {
-                            extraHeaders.append("Proxy-Authorization: ")
-                                    .append(basicAuth(proxy.getUsername(), proxy.getPassword())).append("\r\n");
-                        }
-                        break;
-                    case SOCKS4:
-                        Socks.connect4(in, out, host, port, proxy.getUsername());
-                        break;
-                    case SOCKS5:
-                        Socks.connect5(in, out, host, port, proxy.getUsername(), proxy.getPassword());
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Unsupported proxy type " + proxy.getProxyType());
+            try {
+                return exchange(socket, uri, host, port, proxy, headers, deadline);
+            } catch (IOException e) {
+                if (cancellation != null && cancellation.isCancelled()) {
+                    throw new Cancellation.CancelledException();
+                }
+                throw e;
+            } finally {
+                if (cancellation != null) {
+                    cancellation.unregister(socket);
                 }
             }
-
-            StringBuilder request = new StringBuilder();
-            request.append("GET ").append(requestTarget).append(" HTTP/1.1\r\n");
-            request.append("Host: ").append(hostHeader(host, port)).append("\r\n");
-            for (Map.Entry<String, String> header : headers.entrySet()) {
-                request.append(header.getKey()).append(": ").append(header.getValue()).append("\r\n");
-            }
-            request.append(extraHeaders);
-            request.append("Accept: application/json\r\n");
-            request.append("Connection: close\r\n\r\n");
-            out.write(request.toString().getBytes(StandardCharsets.ISO_8859_1));
-            out.flush();
-
-            return readResponse(in);
         }
+    }
+
+    private Response exchange(Socket socket, URI uri, String host, int port, Proxy proxy,
+                              Map<String, String> headers, long deadline) throws IOException {
+        socket.setSoTimeout(timeoutMillis);
+        InetSocketAddress endpoint = proxy == null
+                ? new InetSocketAddress(host, port)
+                : new InetSocketAddress(proxy.getIp(), proxy.getPort());
+        if (endpoint.isUnresolved()) {
+            throw new UnknownHostException(endpoint.getHostString());
+        }
+        socket.connect(endpoint, timeoutMillis);
+
+        InputStream in = new BufferedInputStream(new DeadlineInputStream(socket.getInputStream(), deadline));
+        OutputStream out = new BufferedOutputStream(socket.getOutputStream());
+
+        String requestTarget = originForm(uri);
+        StringBuilder extraHeaders = new StringBuilder();
+        if (proxy != null) {
+            switch (proxy.getProxyType()) {
+                case HTTP:
+                    requestTarget = "http://" + hostHeader(host, port) + requestTarget;
+                    if (proxy.hasCredentials()) {
+                        extraHeaders.append("Proxy-Authorization: ")
+                                .append(basicAuth(proxy.getUsername(), proxy.getPassword())).append("\r\n");
+                    }
+                    break;
+                case SOCKS4:
+                    Socks.connect4(in, out, host, port, proxy.getUsername());
+                    break;
+                case SOCKS5:
+                    Socks.connect5(in, out, host, port, proxy.getUsername(), proxy.getPassword());
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported proxy type " + proxy.getProxyType());
+            }
+        }
+
+        StringBuilder request = new StringBuilder();
+        request.append("GET ").append(requestTarget).append(" HTTP/1.1\r\n");
+        request.append("Host: ").append(hostHeader(host, port)).append("\r\n");
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            request.append(header.getKey()).append(": ").append(header.getValue()).append("\r\n");
+        }
+        request.append(extraHeaders);
+        request.append("Accept: application/json\r\n");
+        request.append("Connection: close\r\n\r\n");
+        out.write(request.toString().getBytes(StandardCharsets.ISO_8859_1));
+        out.flush();
+
+        return readResponse(in);
     }
 
     /**

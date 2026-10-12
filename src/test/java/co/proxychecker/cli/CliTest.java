@@ -1,6 +1,7 @@
 package co.proxychecker.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -14,6 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -300,5 +304,56 @@ class CliTest {
         stdout.reset();
         assertEquals(Cli.EXIT_OK, run("--cli", "--version"));
         assertTrue(stdout.toString().startsWith("Proxy Checker "));
+    }
+
+    @Test
+    void ctrlCStopsWritesPartialResultsAndExits130() throws Exception {
+        CountDownLatch slowConnected = new CountDownLatch(1);
+        try (FakeServer slow = new FakeServer((in, out) -> {
+            slowConnected.countDown();
+            while (in.read() != -1) {
+                // never answer
+            }
+        })) {
+            Path in = input(workingProxy.address(), slow.address());
+            Path out = dir.resolve("partial.csv");
+            Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true),
+                    new PrintStream(stderr, true), false, 60_000);
+            AtomicInteger code = new AtomicInteger(-1);
+            Thread runner = new Thread(() -> code.set(cli.run(new String[] {"-i", in.toString(), "--api-url", apiUrl(),
+                    "--timeout", "60000", "-o", out.toString(), "-v"})));
+            runner.start();
+            assertTrue(slowConnected.await(10, TimeUnit.SECONDS));
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (!stderr.toString("UTF-8").contains("[WORKING]") && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20);
+            }
+            long start = System.nanoTime();
+            cli.requestStop(); // what the Ctrl+C shutdown hook does
+            runner.join(5000);
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            assertFalse(runner.isAlive());
+            assertEquals(Cli.EXIT_INTERRUPTED, code.get());
+            assertTrue(elapsed < 3000, "took " + elapsed + " ms");
+            String err = stderr.toString("UTF-8");
+            assertTrue(err.contains("Stopped after "), err);
+            assertTrue(err.contains("1 of 2 checked, 1 working"), err);
+            assertTrue(err.contains("Not checked: 1 (interrupted)"), err);
+            assertTrue(err.contains("Wrote 1 proxy to " + out), err);
+            List<String> lines = Files.readAllLines(out, StandardCharsets.UTF_8);
+            assertEquals(2, lines.size(), lines.toString()); // header + the working proxy
+            assertTrue(lines.get(1).startsWith("127.0.0.1," + workingProxy.getPort() + ","), lines.toString());
+        }
+    }
+
+    @Test
+    void ctrlCBeforeCheckingStartsExits130() throws IOException {
+        Path in = input(workingProxy.address());
+        Cli cli = new Cli(new ByteArrayInputStream(new byte[0]), new PrintStream(stdout, true),
+                new PrintStream(stderr, true), false, 60_000);
+        cli.requestStop();
+        assertEquals(Cli.EXIT_INTERRUPTED, cli.run(new String[] {"-i", in.toString(), "--api-url", apiUrl()}));
+        assertTrue(stderr.toString("UTF-8").contains("Interrupted before checking started"));
     }
 }

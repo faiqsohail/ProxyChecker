@@ -26,7 +26,7 @@
             <menus>
                 <Menu mnemonicParsing="false" text="File">
                     <items>
-                        <MenuItem id="open_file" mnemonicParsing="false" text="Open…" onAction="#onMenuItemAction"/>
+                        <MenuItem fx:id="openFileItem" id="open_file" mnemonicParsing="false" text="Open…" onAction="#onMenuItemAction"/>
                         <Menu mnemonicParsing="false" text="Export">
                             <items>
                                 <MenuItem id="export_all" onAction="#onMenuItemAction"
@@ -51,7 +51,7 @@
                             </items>
                         </Menu>
                         <SeparatorMenuItem mnemonicParsing="false"/>
-                        <MenuItem id="preferences" onAction="#onMenuItemAction"
+                        <MenuItem fx:id="preferencesItem" id="preferences" onAction="#onMenuItemAction"
                                   mnemonicParsing="false" text="Preferences…"/>
                         <SeparatorMenuItem mnemonicParsing="false"/>
                         <MenuItem id="quit" onAction="#onMenuItemAction"

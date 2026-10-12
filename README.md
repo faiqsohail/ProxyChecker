@@ -17,6 +17,7 @@ Allows you to quickly check HTTP and SOCKS proxies in a user friendly GUI, for W
 * Ability to Load from multiple Proxy Lists
 * Proxy Anonymity, Response Time & Country Information
 * Export Table (CSV) and Export Based on Anonymity
+* Stop a check at any time: the Check button becomes Stop and keeps the results gathered so far
 * Command line mode for servers and scripts (no GUI required)
 
 ### Requirements
@@ -40,6 +41,13 @@ Simply download the latest packaged release for your system and run!
 
 Now also available on [Docker Hub](https://hub.docker.com/r/faiqsohail/proxychecker) 🐳
 
+
+### Stopping a Check
+While a check runs, the **Check** button becomes **Stop**. Stopping skips the proxies that haven't started,
+closes connections that are in progress (no waiting for timeouts) and keeps every result already in the table.
+The status bar then shows e.g. `Checked Proxies: 4 of 14 (stopped, 10 not checked)`. The proxy input, the
+loaded list (adding, deleting, drag and drop), File → Open… and Preferences… are disabled while checking, and
+re-enabled when the check finishes or is stopped. Closing the window stops a running check too.
 
 ### Command Line
 Run the same checker without the GUI (JavaFX is not initialised, so it works on headless servers):
@@ -77,8 +85,14 @@ Failure reasons include `timeout`, `connection refused`, `auth failed`, `auth re
 With Docker, arguments are passed straight to the application:
 ```
 docker run --rm -v "$PWD:/data" faiqsohail/proxychecker --cli -i /data/proxies.txt -t socks4 -v -o /data/results.csv
-``` Exit codes: `0` working proxies found, `1` none working,
-`2` invalid arguments or no valid proxies in the input, `3` file or public IP lookup error.
+```
+
+Press Ctrl+C to stop early: in-flight checks are aborted, the proxies checked so far are still written
+to the output, the summary says how many weren't checked, and the exit code is `130`.
+
+Exit codes: `0` working proxies found, `1` none working,
+`2` invalid arguments or no valid proxies in the input, `3` file or public IP lookup error,
+`130` interrupted with Ctrl+C.
 Running the jar without arguments opens the GUI as before.
 
 ### Build from Source

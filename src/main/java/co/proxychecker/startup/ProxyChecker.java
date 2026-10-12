@@ -13,6 +13,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.stage.Stage;
 
+import co.proxychecker.commands.ProxyCheckCommand;
 import co.proxychecker.components.RequestAPI;
 import co.proxychecker.components.Settings;
 import co.proxychecker.components.UpdateChecker;
@@ -62,10 +63,16 @@ public class ProxyChecker extends Application {
         primaryStage.getIcons().add(Resources.icon());
         primaryStage.setTitle(Settings.getApplicationName());
         primaryStage.setOnCloseRequest(event -> {
+            ProxyCheckCommand.stop(); // closes in-flight connections before the JVM goes away
             Platform.exit();
             System.exit(0);
         });
         primaryStage.show();
+    }
+
+    @Override
+    public void stop() {
+        ProxyCheckCommand.stop();
     }
 
     /**

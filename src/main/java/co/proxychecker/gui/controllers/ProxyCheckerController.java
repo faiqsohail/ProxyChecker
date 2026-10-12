@@ -75,6 +75,11 @@ public class ProxyCheckerController implements Initializable {
     @FXML
     private ProgressBar progressBar;
 
+    @FXML
+    private MenuItem openFileItem;
+    @FXML
+    private MenuItem preferencesItem;
+
     private int totalToCheck;
     private int workingProxies;
 
@@ -139,11 +144,14 @@ public class ProxyCheckerController implements Initializable {
     }
 
     /**
-     * Executed when the check button is clicked.
+     * Executed when the check button is clicked: starts a check, or stops the running one.
      */
     @FXML
     private void onCheckAction() {
         if (ProxyCheckCommand.isRunning()) {
+            ProxyCheckCommand.stop();
+            checkButton.setText("Stopping…");
+            checkButton.setDisable(true); // re-enabled once the check has wound down
             return;
         }
         if (loadedProxiesList.getItems().isEmpty()) {
@@ -157,10 +165,24 @@ public class ProxyCheckerController implements Initializable {
         workingProxiesLabel.setText("Working Proxies: 0");
         checkedProxiesLabel.setText("Checked Proxies: 0");
         proxyTable.getItems().clear();
-        inputField.requestFocus();
-        checkButton.setDisable(true);
-        ProxyCheckCommand.check(new ArrayList<>(loadedProxiesList.getItems()),
-                this::onProxiesChecked, this::onCheckCompleted);
+        setChecking(true);
+        if (!ProxyCheckCommand.check(new ArrayList<>(loadedProxiesList.getItems()),
+                this::onProxiesChecked, this::onCheckCompleted)) {
+            setChecking(false);
+        }
+    }
+
+    /**
+     * Switches the window between idle and checking: while checking, the Check button becomes Stop and
+     * everything that would change the proxy list or the settings in use is disabled.
+     */
+    private void setChecking(boolean checking) {
+        checkButton.setText(checking ? "Stop" : "Check");
+        checkButton.setDisable(false);
+        inputField.setDisable(checking);
+        openFileItem.setDisable(checking);
+        preferencesItem.setDisable(checking);
+        loadedProxiesList.setDisable(checking); // also blocks Delete and drag and drop
     }
 
     /**
@@ -179,9 +201,16 @@ public class ProxyCheckerController implements Initializable {
         progressBar.setProgress((double) checked / totalToCheck);
     }
 
-    private void onCheckCompleted() {
+    private void onCheckCompleted(boolean stopped) {
+        setChecking(false);
+        if (stopped) {
+            int checked = proxyTable.getItems().size();
+            progressBar.setProgress((double) checked / totalToCheck);
+            checkedProxiesLabel.setText("Checked Proxies: " + checked + " of " + totalToCheck + " (stopped, "
+                    + (totalToCheck - checked) + " not checked)");
+            return;
+        }
         progressBar.setProgress(0);
-        checkButton.setDisable(false);
         AlertBox.show(Alert.AlertType.INFORMATION, "Task Completed",
                 "Proxy Checker has finished checking your proxies!");
     }
@@ -229,6 +258,7 @@ public class ProxyCheckerController implements Initializable {
                 Window.show("About", Resources.ABOUT_VIEW);
                 break;
             case "quit":
+                ProxyCheckCommand.stop();
                 System.exit(0);
                 break;
             default:
